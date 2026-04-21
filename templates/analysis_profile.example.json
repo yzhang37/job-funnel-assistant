@@ -1,0 +1,53 @@
+{
+  "must": [
+    {
+      "name": "岗位方向匹配",
+      "fields": ["title", "description"],
+      "match_any": ["backend", "platform", "infra", "distributed systems"]
+    },
+    {
+      "name": "语言基础匹配",
+      "fields": ["description", "requirements"],
+      "match_any": ["python", "golang", "go"]
+    }
+  ],
+  "prefer": [
+    {
+      "name": "AI 或数据相关经验",
+      "fields": ["description", "requirements"],
+      "match_any": ["machine learning", "llm", "rag", "data platform"],
+      "weight": 30
+    },
+    {
+      "name": "远程或混合办公",
+      "fields": ["location", "description"],
+      "match_any": ["remote", "hybrid"],
+      "weight": 20
+    },
+    {
+      "name": "系统设计复杂度高",
+      "fields": ["description", "requirements"],
+      "match_any": ["scalable", "distributed", "high availability", "architecture"],
+      "weight": 25
+    }
+  ],
+  "avoid": [
+    {
+      "name": "纯驻场限制",
+      "fields": ["location", "description"],
+      "match_any": ["onsite only", "5 days onsite"],
+      "weight": 35
+    },
+    {
+      "name": "偏销售或强出差",
+      "fields": ["description", "requirements"],
+      "match_any": ["sales", "travel 50%", "business development"],
+      "weight": 30
+    }
+  ],
+  "thresholds": {
+    "strong_match": 60,
+    "consider": 25
+  }
+}
+

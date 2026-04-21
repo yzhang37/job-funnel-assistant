@@ -1,0 +1,9 @@
+{
+  "fragments": [
+    "profiles/base_candidate.md",
+    "profiles/preferences/backend_platform.md",
+    "profiles/work_auth/unknown.md",
+    "profiles/patches/empty.md"
+  ]
+}
+

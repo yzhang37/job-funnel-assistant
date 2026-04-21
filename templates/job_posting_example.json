@@ -1,0 +1,12 @@
+{
+  "title": "Senior Backend Engineer",
+  "company": "Example AI",
+  "location": "San Francisco or Remote",
+  "description": "Build scalable backend services for LLM products. Work on distributed systems, architecture decisions, and Python services.",
+  "requirements": [
+    "5+ years backend engineering experience",
+    "Strong Python or Go background",
+    "Experience with machine learning platforms is a plus"
+  ],
+  "salary_text": "$180,000 - $230,000"
+}
