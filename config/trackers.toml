@@ -1,0 +1,89 @@
+version = 1
+
+[[trackers]]
+id = "tinder_engineer_within_1_week"
+label = "Tinder Engineer within 1 week"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=Tinder+Engineer+within+1+week&distance=25&f_C=3517767%2C2603651%2C24972212&f_SAL=&geoId=103644278"
+source_frequency = "daily"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "mid_level_software_engineer_linkedin"
+label = "Mid level software engineer"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=Mid+level+software+engineer&distance=25&f_C=1337&f_SAL=&geoId=103644278"
+source_frequency = "daily"
+target_new_jobs = 30
+enabled = true
+
+[[trackers]]
+id = "software_engineer_golang_full_time_within_1_week"
+label = "software engineer golang full-time within 1 week"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=software+engineer+golang+full-time+within+1+week&distance=25&f_SAL=f_SA_id_227001%3A276001%2C277001%24f_SA_id_226001%3A272015&geoId=103644278"
+source_frequency = "daily"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "mid_level_software_engineer_golang"
+label = "Mid-level software engineer golang"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=Mid-level+software+engineer+golang&distance=25&f_SAL=f_SA_id_227001%3A276001%2C277001%24f_SA_id_226001%3A272015&geoId=103644278"
+source_frequency = "daily"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "openai_ai_infra_roles"
+label = "AI infrastructure engineer LLM platform engineer ML infrastructure distributed systems AI backend engineer AI"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=AI+infrastructure+engineer+LLM+platform+engineer+ML+infrastructure+distributed+systems+AI+backend+engineer+AI&distance=25&f_C=11130470&f_SAL=f_SA_id_227001%3A276001%2C277001&geoId=103644278"
+source_frequency = "daily"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "selected_ai_infra_companies"
+label = "AI infrastructure engineer LLM platform engineer ML infrastructure distributed systems AI backend engineer AI (selected companies)"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=AI+infrastructure+engineer+LLM+platform+engineer+ML+infrastructure+distributed+systems+AI+backend+engineer+AI&distance=25&f_C=74126343%2C18846814%2C89566597%2C28987090%2C74882602%2C89943342%2C105311076%2C73014032%2C6643518%2C68302528%2C35575530%2C81739298%2C36095797%2C77105967%2C1331150%2C91431767%2C82507665%2C103743985%2C99351559%2C86583130%2C101842393%2C79089195%2C105341965%2C77745852%2C11741116%2C81917876%2C105610681&f_SAL=f_SA_id_227001%3A276001%2C277001&geoId=103644278"
+source_frequency = "daily"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "mid_level_backend_distributed_under_10"
+label = "mid-level software engineer, backend, distributed system"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=mid-level+software+engineer%2C+backend%2C+distributed+system&distance=25&f_EA=true&f_SAL=&geoId=103644278"
+source_frequency = "daily"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "mid_level_backend_distributed_weekly"
+label = "mid-level software engineer, backend, distributed system"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=mid-level+software+engineer%2C+backend%2C+distributed+system&distance=25&f_SAL=&geoId=103644278"
+source_frequency = "weekly"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "nordstrom_mid_level_within_1_week"
+label = "mid-level engineer with 1 week"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=mid-level+engineer+with+1+week+&distance=50&f_C=3379&f_SAL=&geoId=104116203"
+source_frequency = "weekly"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "microsoft_backend_distributed_no_clearance"
+label = "Mid-level Engineer within 1 week, Prefer Seattle, open to US locations. Backend or distributed systems roles. NO CITIZENSHIP, TOP SECRET, POLYGRAPH requirement"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=Mid-level+Engineer+within+1+week%2C+Prefer+Seattle%2C+open+to+US+locations.+Backend+or+distributed+systems+roles.+NO+CITIZENSHIP%2C+TOP+SECRET%2C+POLYGRAPH+requirement&distance=50&f_C=1035%2C18201534&f_SAL=&geoId=104116203"
+source_frequency = "weekly"
+target_new_jobs = 30
+enabled = false
+
+[[trackers]]
+id = "google_seattle_backend_platform"
+label = "Mid-level Software Engineer roles at Google in the Seattle area posted within the last 7 days. Application-level backend or platform engineering using Go, Java, or Python. Exclude C++-heavy, graphics, Hadoop, Spark internals, and low-level engine optimization roles. Individual contributor only. No U.S. citizenship or security clearance requirements."
+url = "https://www.linkedin.com/jobs/search-results/?keywords=Mid-level+Software+Engineer+roles+at+Google+in+the+Seattle+area+posted+within+the+last+7+days.+Application-level+backend+or+platform+engineering+using+Go%2C+Java%2C+or+Python.+Exclude+C%2B%2B-heavy%2C+graphics%2C+Hadoop%2C+Spark+internals%2C+and+low-level+engine+optimization+roles.+Individual+contributor+only.+No+U.S.+citizenship+or+security+clearance+requirements.&distance=25&f_C=1441&f_SAL=&geoId=90000091"
+source_frequency = "weekly"
+target_new_jobs = 30
+enabled = false

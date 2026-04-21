@@ -2,7 +2,7 @@
 
 ## Proposed Pipeline
 
-1. Source collector
+1. Tracker monitor / scheduler
 2. Browser capture / page traversal
 3. Job normalizer
 4. Company profile normalizer
@@ -13,6 +13,13 @@
 
 ## Collector Strategy
 
+- Treat configured job trackers as the first discovery layer. The scheduler should periodically revisit tracker URLs and discover previously unseen job links.
+- Scheduler scope is intentionally narrow: discover new job links, persist run state, and hand links off to capture. Do not do fit analysis or ranking in this stage.
+- Tracker config should stay minimal and user-owned. Current stable fields are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
+- `target_new_jobs` means "discover this many new job links for the current run, or stop early if the source is exhausted." Internal paging should stay inside the capture/scheduler runtime, not inside user config.
+- Tracker scheduling state should remain portable across storage backends. SQLite is the first driver, but the service boundary should remain compatible with future MySQL/Aurora adapters.
+- Current LinkedIn tracker experiment validated a lightweight discovery path: click a left-side result card, read `currentJobId` from the search-results URL, normalize it to `https://www.linkedin.com/jobs/view/<job_id>/`, and page forward only when more new links are needed.
+- LinkedIn discovery should stop at canonical JD links. Reading the right-side JD body is part of later capture, not scheduler responsibility.
 - Prefer APIs when available
 - Use scripted browser automation where feasible
 - Use `Computer Use` for brittle, high-friction manual-style flows
@@ -52,3 +59,4 @@ Fallbacks:
 - bundle directory: standard handoff unit for analyzer, Telegram, Notion, and archival flows
 - cache: company-level static fields and dynamic insights live in separate namespaces so one company can be reused across many jobs
 - resolver mapping: company-to-LinkedIn slug/url resolution should be cacheable so repeated jobs do not need repeated company search
+- tracker scheduler state: tracker runs and discovered job links should be persisted separately from analyzer results so discovery can stay lightweight and replaceable

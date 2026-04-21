@@ -18,9 +18,15 @@
 - [x] Import historical Wolai job data into Notion
 - [x] Define suitability scoring output shape
 - [ ] Decide how to deduplicate repeated job posts
+- [x] Define minimal tracker config shape for recurring LinkedIn tracker monitoring
 
 ## Phase 2: First End-To-End Flow
 
+- [x] Add tracker scheduler config file for current LinkedIn trackers
+- [x] Add due-run logic for daily/weekly trackers
+- [x] Add replaceable tracker scheduler storage boundary with SQLite first
+- [ ] Connect tracker scheduler to real browser execution and paging
+- [x] Validate LinkedIn tracker discovery flow on a real search-results page: click result card -> derive `currentJobId` -> canonicalize to JD link -> move to `Page 2` when needed
 - [ ] Collect jobs from one source
 - [ ] Normalize captured data
 - [x] Define first browser-capture milestone as `extracted sections -> jd.md`
@@ -88,3 +94,17 @@ Current capture progress:
 - `scripts/build_job_capture_bundle.py` and `scripts/build_company_profile_bundle.py` now expose the first standardized output layer for downstream analyzer/storage/notifier usage
 - `company_profile` schema now supports `source_snapshots`, so one company profile can preserve site-native signals, LinkedIn insights, and official-site evidence side by side
 - `company_profile` schema now also preserves `related_pages`, `available_signals`, `missing_signals`, and `raw_sections`, so the first capture program keeps as much analyzer-relevant evidence as possible
+
+Current tracker scheduler progress:
+
+- `config/trackers.toml` now stores the current LinkedIn trackers in a minimal config-driven format
+- tracker config currently keeps only the scheduler-facing fields: `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`
+- `target_new_jobs` is defined as "new job links to discover this run", not "top N jobs on the first page"
+- `src/job_search_assistant/tracker_scheduler/` now contains config loading, due logic, and scheduler service code
+- storage is intentionally abstracted behind `TrackerStateStore`, with SQLite as the first implementation and room for MySQL/Aurora adapters later
+- `scripts/list_due_trackers.py` can list which trackers should run now
+- `scripts/record_tracker_discovery.py` can persist one tracker run and record which discovered links were new
+- `src/job_search_assistant/tracker_scheduler/linkedin.py` now captures the first validated LinkedIn-specific rule: convert `search-results?...currentJobId=<id>` or `/jobs/view/<id>/...` into canonical JD links
+- `scripts/normalize_linkedin_job_links.py` now provides a thin CLI bridge from raw browser-collected LinkedIn URLs to stable `https://www.linkedin.com/jobs/view/<job_id>/` links
+- tracker scheduler explicitly stops at discovery. It does not rank, analyze, or decide fit; those remain in capture/analyzer layers
+- real-page experiment on `mid_level_software_engineer_linkedin` confirmed that discovery can stay lightweight: click left result cards, read `currentJobId`, normalize to JD links, and page forward when the first page is exhausted

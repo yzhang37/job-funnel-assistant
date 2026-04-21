@@ -21,20 +21,22 @@
 
 当前推荐的主流程：
 
-1. 岗位来源采集
-2. 结构化清洗
-3. 按你的模板分析匹配度
-4. 写入 Notion 数据库
-5. 发送消息提醒
-6. 你确认后再决定是否投递
+1. Tracker Scheduler 定期访问你配置好的 job trackers
+2. 只发现新的 job links
+3. Capture Program 抓 JD 和公司画像，产出 bundle
+4. Analyzer 按你的模板分析匹配度
+5. 写入 Notion 数据库
+6. 发送消息提醒
+7. 你确认后再决定是否投递
 
 ## 为什么这样设计
 
 这条链路适合你的场景：
 
+- 邮件只是提醒，不是完整数据源；真正的机会池来自 tracker / search results
 - 有些网站需要网页自动化，不能只靠 API
 - 你已经有现成分析模板和简历模板，适合复用
-- 你希望先收到“值得看”的内容，而不是让系统直接替你投递
+- 你希望先稳定发现新岗位，再交给后面的抓取和分析，而不是让调度层直接替你做判断
 
 ## 推荐集成
 
@@ -83,6 +85,7 @@
 ├── PLANS.md
 ├── automations/
 ├── config/
+│   └── trackers.toml
 ├── data/
 │   ├── cache/
 │   ├── processed/
@@ -95,12 +98,16 @@
 │   ├── analyze_job_fit.py
 │   ├── build_company_profile_bundle.py
 │   ├── build_job_capture_bundle.py
+│   ├── list_due_trackers.py
+│   ├── normalize_linkedin_job_links.py
+│   ├── record_tracker_discovery.py
 │   ├── render_company_profile.py
 │   ├── render_jd_markdown.py
 │   ├── run_job_funnel_analysis.py
 │   └── prepare_wolai_import.py
 ├── src/
 │   └── job_search_assistant/
+│       └── tracker_scheduler/
 └── templates/
 ```
 
@@ -215,6 +222,33 @@
 - 以后接 Computer Use 或别的 agent，不需要再重新定义输出协议
 - 附件数量和文件名都可以保持松散，不需要写死
 
+在这两个公开 capture 接口之前，现在多了一层调度入口：
+
+- `tracker url -> new job links`
+
+这层只解决一件事：
+
+- 定期访问你配置好的 LinkedIn trackers
+- 把当前结果里之前没见过的 job links 发现出来
+
+它不负责：
+
+- 匹配度判断
+- 公司价值判断
+- 排序优先级
+
+这些都属于后面的 capture / analyzer。
+
+当前这层已经做过一次真实的 LinkedIn tracker 实验，验证到的规则是：
+
+1. discovery 这一步只需要 JD link，不需要先抓 JD 正文或公司画像
+2. 最稳的链接提取方式不是读右侧正文，而是：
+   - 点击左侧岗位卡片
+   - 从当前搜索结果页 URL 里读 `currentJobId`
+   - 规范化成 `https://www.linkedin.com/jobs/view/<job_id>/`
+3. 如果第一页不够，就继续翻页；翻页属于调度器内部行为，不应该暴露成用户配置
+4. 这一步到“拿到 canonical JD link”就结束，后面再交给 Capture Program
+
 ## 模板文件
 
 - `templates/analysis_template.md`: 粘贴你的岗位分析模板
@@ -236,12 +270,17 @@
 - `scripts/render_company_profile.py`: 将公司画像 capture 渲染成 `company_profile.md`，并可选写入缓存
 - `scripts/build_job_capture_bundle.py`: 生成标准化 job bundle
 - `scripts/build_company_profile_bundle.py`: 生成标准化 company profile bundle
+- `scripts/list_due_trackers.py`: 列出当前应该运行的 trackers
+- `scripts/normalize_linkedin_job_links.py`: 把浏览器里拿到的 LinkedIn `search-results` / `view` URL 规范化成稳定 JD link
+- `scripts/record_tracker_discovery.py`: 记录一次 tracker 运行发现了哪些 job links
 - `examples/jd_example.md`: 示例 JD
 - `examples/company_profile_example.json`: 示例公司画像输入
 - `src/job_search_assistant/cache/`: 配置驱动的缓存策略与 SQLite 存储
 - `src/job_search_assistant/capture/`: browser capture 的最小文本整理层
+- `src/job_search_assistant/tracker_scheduler/`: tracker 配置、due 逻辑、存储抽象与 SQLite 第一版实现
 - `docs/company-profile-capture.md`: company profile capture spec
 - `docs/capture-bundle-spec.md`: bundle / manifest / 两个公开接口说明
+- `docs/tracker-scheduler.md`: tracker-first discovery 层说明
 
 ## 当前可运行命令
 
@@ -370,6 +409,47 @@ python3 scripts/build_company_profile_bundle.py \
 - 浏览器驱动层后续只负责把抓到的数据喂给 bundle writer
 - 暂时还不是“给一个 URL 就自动抓完”的最终版本
 
+7. 列出当前到期的 trackers：
+
+```bash
+python3 scripts/list_due_trackers.py \
+  --config config/trackers.toml \
+  --db data/cache/tracker_scheduler.sqlite3
+```
+
+8. 记录一次 tracker 运行结果：
+
+```bash
+python3 scripts/record_tracker_discovery.py \
+  --config config/trackers.toml \
+  --db data/cache/tracker_scheduler.sqlite3 \
+  --tracker-id mid_level_software_engineer_golang \
+  --job-url https://www.linkedin.com/jobs/view/1 \
+  --job-url https://www.linkedin.com/jobs/view/2
+```
+
+这两条命令当前的定位：
+
+- `list_due_trackers.py` 只判断“哪些 tracker 现在该跑了”
+- `record_tracker_discovery.py` 只记录“这次发现了哪些 job links，哪些是新的”
+- 这层只做 discovery，不做 analysis
+- 真正的翻页、抓够 `target_new_jobs` 条新链接，属于后续浏览器执行层
+
+9. 把原始 LinkedIn 搜索页 URL 规范化成 JD link：
+
+```bash
+python3 scripts/normalize_linkedin_job_links.py \
+  --url "https://www.linkedin.com/jobs/search-results/?currentJobId=4391165384&keywords=Mid+level+software+engineer" \
+  --url "https://www.linkedin.com/jobs/view/4391193012/?alternateChannel=search"
+```
+
+这条命令当前的定位：
+
+- 接收浏览器里实际拿到的 LinkedIn URL
+- 支持 `search-results?...currentJobId=<id>` 和 `/jobs/view/<id>/...`
+- 输出统一的 canonical JD link
+- 方便后续浏览器执行层只做点击和分页，不需要自己拼很多 URL 逻辑
+
 注意：
 
 - 当前 Python 代码还没有直接驱动 `Computer Use`
@@ -441,6 +521,38 @@ python3 scripts/build_company_profile_bundle.py \
 - [docs/company-profile-capture.md](/Users/l/Projects/找工作/docs/company-profile-capture.md)
 - [docs/linkedin-company-resolution.md](/Users/l/Projects/找工作/docs/linkedin-company-resolution.md)
 - [docs/capture-bundle-spec.md](/Users/l/Projects/找工作/docs/capture-bundle-spec.md)
+- [docs/tracker-scheduler.md](/Users/l/Projects/找工作/docs/tracker-scheduler.md)
+
+## Tracker Scheduler
+
+当前调度层的边界是：
+
+1. 读取 `config/trackers.toml`
+2. 按 `source_frequency` 判断哪些 trackers 到期
+3. 访问 tracker 对应的 LinkedIn search results
+4. 发现新的 job links
+5. 把这些链接交给后续 capture
+
+这里的 tracker 配置当前刻意保持很瘦：
+
+- `id`
+- `label`
+- `url`
+- `source_frequency`
+- `target_new_jobs`
+- `enabled`
+
+其中：
+
+- `target_new_jobs = 30` 的意思不是“抓前 30 条”
+- 而是“本次尽量抓到 30 条之前没见过的新链接；如果 LinkedIn 到底了，就提前停止”
+- 当前真实页面实验还确认了：对 LinkedIn search results，最稳的发现流程是“点左侧结果卡片 -> 读 `currentJobId` -> 规范化成 JD link -> 必要时切到 `Page 2`”
+
+数据库层也没有写死 SQLite 作为唯一选择。现在的实现是：
+
+- 先抽象调度状态存储接口
+- 默认实现 `SQLiteTrackerStateStore`
+- 后续可以补 MySQL / Aurora，而不改上层 scheduler 逻辑
 
 ## 下一步
 

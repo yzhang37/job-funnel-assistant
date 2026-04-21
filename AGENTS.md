@@ -29,10 +29,16 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 ## Working Style
 
 - Prefer incremental delivery over large one-shot builds.
-- Keep the pipeline modular: collector, analyzer, storage, notifier.
+- Keep the pipeline modular: tracker scheduler, capture, analyzer, storage, notifier.
 - Design around replaceable integrations. Notion and Telegram are preferred initial targets, but avoid coupling core logic to any one provider.
 - When a website has no reliable API, browser automation is acceptable. Prefer robust selectors and explicit retry logic.
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
+- Treat job trackers as the first discovery layer. The scheduler should only discover new job links from configured tracker URLs; it must not perform fit analysis or ranking.
+- Keep tracker configuration minimal and config-driven. Stable fields currently expected are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
+- `target_new_jobs` means "keep paging internally until this many previously unseen job links are found, or the source is exhausted." Pagination is an implementation detail, not a user-facing config field.
+- State storage for tracker scheduling should remain driver-abstracted. SQLite is the first implementation, but the service boundary should stay portable to MySQL/Aurora later.
+- For LinkedIn tracker discovery, treat the canonical output as JD links only. Current validated path is: click a result card -> read `currentJobId` from the search-results URL -> normalize to `https://www.linkedin.com/jobs/view/<job_id>/`.
+- LinkedIn tracker discovery should not depend on reading the right-side JD body. Right-side content is for later capture, not for discovery.
 - For the first browser capture milestone, prefer a minimal output: convert extracted page content into `jd.md` before expanding to full packet/attachment workflows.
 - Company profile capture should remain source-agnostic. The stable output should be `company_profile.json` / `company_profile.md`, while source-specific behavior such as LinkedIn Premium Insights belongs in optional capture strategies rather than the core schema.
 - Public capture should converge on two entrypoints: `job link -> bundle` and `company name -> bundle`. Bundle output is the stable handoff format for analyzer, storage, and notification layers.
@@ -53,6 +59,9 @@ The project may start without a fixed stack. Before adding new tools or dependen
 
 Common expected commands once implemented:
 
+- list due trackers: `python3 scripts/list_due_trackers.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3`
+- record tracker discovery: `python3 scripts/record_tracker_discovery.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3 --tracker-id <tracker_id> --job-url <job_url>`
+- normalize raw LinkedIn tracker URLs to JD links: `python3 scripts/normalize_linkedin_job_links.py --url <linkedin_search_or_view_url>`
 - analyze one job: `python3 scripts/analyze_job_fit.py --job <job.json> --profile <profile.json> --pretty`
 - run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <mock|openai>`
 - render jd markdown: `python3 scripts/render_jd_markdown.py --input <capture.json> --output <jd.md>`
@@ -90,4 +99,5 @@ Initial focus:
 2. ingest the user's existing analysis and resume templates
 3. define the Notion schema
 4. choose and wire a message notification channel
-5. build a first end-to-end flow for one target job source
+5. build a tracker-first discovery loop: trackers -> new job links -> capture -> analyzer
+6. validate the first real LinkedIn tracker execution path: click result cards, derive canonical JD links, and keep analysis out of the scheduler
