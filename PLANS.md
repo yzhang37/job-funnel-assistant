@@ -9,6 +9,7 @@
 - [ ] Confirm preferred notification channel
 - [x] Create first standalone job-fit analyzer component
 - [x] Build LLM-driven Job Funnel / Resume Fit Analyst runner
+- [x] Add config-driven cache policy layer for company/job snapshots
 
 ## Phase 1: Data Model
 
@@ -60,3 +61,5 @@ Current analyzer progress:
 - `prompts/job_funnel_resume_fit_analyst_spec.md` stores the user's analyzer spec without rewriting its framework
 - `scripts/run_job_funnel_analysis.py` can run one JD through a profile stack and render the fixed report format
 - `profiles/` now separates stable candidate background, preferences, work authorization, and resume patches
+- `config/cache_policy.toml` now controls cache TTL defaults and field-level overrides without hardcoding policy in Python
+- `src/job_search_assistant/cache/` provides a lightweight SQLite-backed cache store for reusable company/job snapshot data

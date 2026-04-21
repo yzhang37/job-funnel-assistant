@@ -82,6 +82,7 @@
 ├── README.md
 ├── PLANS.md
 ├── automations/
+├── config/
 ├── data/
 │   ├── processed/
 │   └── raw/
@@ -123,6 +124,7 @@
 ## Analyzer 关键文件
 
 - `prompts/job_funnel_resume_fit_analyst_spec.md`: 你给定的 analyzer 原始 spec
+- `config/cache_policy.toml`: 缓存策略配置，支持默认值、namespace 级别覆盖、字段级覆盖
 - `profiles/default_stack.json`: 默认候选人画像 stack
 - `profiles/base_candidate.md`: 长期稳定候选人画像
 - `profiles/preferences/`: 兴趣方向、岗位偏好等可插拔层
@@ -130,6 +132,7 @@
 - `profiles/patches/`: 近期简历更新或特殊补丁
 - `scripts/run_job_funnel_analysis.py`: 新的主入口
 - `examples/jd_example.md`: 示例 JD
+- `src/job_search_assistant/cache/`: 配置驱动的缓存策略与 SQLite 存储
 
 ## 当前可运行命令
 
@@ -187,6 +190,33 @@ profile stack 的意义：
 - `patches`: 最近简历补丁、求职策略补丁
 
 更新这些内容时，不需要改 analyzer spec，只需要替换或追加 profile fragment。
+
+## Cache Layer
+
+仓库现在内置了一个轻量缓存层，目标是给后续的 capture agent 和 analyzer 复用公司级/岗位级快照数据。
+
+设计原则：
+
+- TTL 不写死在代码里，而是放在 `config/cache_policy.toml`
+- 支持三层继承：`defaults -> profiles.<namespace> -> [[rules]] 字段级覆盖`
+- 同一 namespace 下，不同字段可以有不同 freshness 策略
+- 数据库存储使用 SQLite，适合本地单用户工作流
+
+当前推荐的缓存 namespace：
+
+- `company_insights`: 公司级 Premium insights、headcount、alumni 等
+- `job_posting`: 具体岗位状态、JD 文本、相关 openings
+- `company_profile_static`: 公司简介、行业、官网等变化较慢的数据
+- `capture_artifact`: 截图、原始抓取产物等长期可复用材料
+
+当前默认缓存思想：
+
+- `job_posting` 更短，例如 `6h - 1d`
+- `company_insights` 中等，例如 `14d - 30d`
+- `company_profile_static` 更长，例如 `90d`
+- `capture_artifact` 基本按归档处理
+
+这不是写死逻辑，只是 `config/cache_policy.toml` 里的初始配置。后续你可以按字段继续细化，比如单独给 `total_employees`、`job_openings_total`、`notable_alumni` 配不同 TTL。
 
 ## 下一步
 

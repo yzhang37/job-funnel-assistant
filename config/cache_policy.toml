@@ -1,0 +1,84 @@
+[defaults]
+fresh_for = "14d"
+stale_for = "90d"
+
+[profiles.company_insights]
+fresh_for = "30d"
+stale_for = "120d"
+
+[profiles.job_posting]
+fresh_for = "12h"
+stale_for = "14d"
+
+[profiles.company_profile_static]
+fresh_for = "90d"
+stale_for = "365d"
+
+[profiles.capture_artifact]
+fresh_for = "365d"
+stale_for = "3650d"
+
+[[rules]]
+namespace = "company_insights"
+field = "company_focus_areas"
+fresh_for = "45d"
+
+[[rules]]
+namespace = "company_insights"
+field = "total_employees"
+fresh_for = "30d"
+
+[[rules]]
+namespace = "company_insights"
+field = "median_tenure_years"
+fresh_for = "30d"
+
+[[rules]]
+namespace = "company_insights"
+field = "job_openings_total"
+fresh_for = "14d"
+
+[[rules]]
+namespace = "company_insights"
+field = "job_openings_growth"
+fresh_for = "14d"
+
+[[rules]]
+namespace = "company_insights"
+field = "headcount_growth"
+fresh_for = "14d"
+
+[[rules]]
+namespace = "company_insights"
+field = "notable_alumni"
+fresh_for = "30d"
+
+[[rules]]
+namespace = "company_insights"
+source_platform = "linkedin"
+field = "alumni_companies"
+fresh_for = "30d"
+
+[[rules]]
+namespace = "job_posting"
+field = "posting_status"
+fresh_for = "6h"
+stale_for = "3d"
+
+[[rules]]
+namespace = "job_posting"
+field = "jd_text"
+fresh_for = "1d"
+stale_for = "14d"
+
+[[rules]]
+namespace = "job_posting"
+field = "related_openings"
+fresh_for = "1d"
+stale_for = "7d"
+
+[[rules]]
+namespace = "capture_artifact"
+field = "screenshot"
+fresh_for = "365d"
+stale_for = "3650d"

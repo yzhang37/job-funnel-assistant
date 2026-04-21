@@ -16,9 +16,11 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 
 - `README.md`: human-readable overview and setup notes
 - `PLANS.md`: active roadmap and phased execution plan
+- `config/`: runtime configuration such as cache policy and future pipeline settings
 - `templates/`: reusable prompt, analysis, and resume templates
 - `scripts/`: lightweight utility scripts and automation entrypoints
 - `src/`: application code
+- `data/cache/`: SQLite cache files and reusable capture/analyzer snapshots
 - `data/raw/`: raw job capture artifacts
 - `data/processed/`: normalized or scored job records
 - `docs/`: supporting design notes and integration decisions
@@ -30,6 +32,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Keep the pipeline modular: collector, analyzer, storage, notifier.
 - Design around replaceable integrations. Notion and Telegram are preferred initial targets, but avoid coupling core logic to any one provider.
 - When a website has no reliable API, browser automation is acceptable. Prefer robust selectors and explicit retry logic.
+- Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
 - Preserve the user's templates and wording where possible; avoid rewriting them unless asked.
 
 ## Commands
@@ -44,6 +47,7 @@ Common expected commands once implemented:
 
 - analyze one job: `python3 scripts/analyze_job_fit.py --job <job.json> --profile <profile.json> --pretty`
 - run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <mock|openai>`
+- validate cache layer: `python3 -m py_compile src/job_search_assistant/cache/*.py`
 - run app: `TBD`
 - run automation: `TBD`
 - test: `TBD`
