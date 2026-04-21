@@ -1,0 +1,197 @@
+{
+  "company_name": "Glean",
+  "source_url": "https://www.linkedin.com/company/gleanwork/insights/?insightType=HEADCOUNT",
+  "source_platform": "linkedin",
+  "company_tagline": "The Work AI platform connected to all your company data. Find, create, and automate anything.",
+  "company_description": "Work AI for all.",
+  "industry": "Software Development",
+  "headquarters": "Palo Alto, CA",
+  "followers_text": "201K followers",
+  "employee_size_text": "501-1K employees",
+  "employees_on_platform_text": "1,600 employees on LinkedIn",
+  "featured_customers": [
+    "Rivian"
+  ],
+  "bridge_signals": [
+    "Glean hired 7 people from TikTok.",
+    "Glean hired 3 people from Boston University."
+  ],
+  "competitor_names": [
+    "Kore.ai",
+    "Copilot Studio",
+    "Microsoft Fabric"
+  ],
+  "headline_metrics": {
+    "job_openings_total": "247",
+    "job_openings_period": "Q1 2026",
+    "total_employees": "1,593",
+    "company_growth_6m": "20% increase",
+    "company_growth_1y": "55% increase",
+    "company_growth_2y": "200% increase",
+    "engineering_growth_2y": "106% increase",
+    "median_tenure_years": "1.1"
+  },
+  "narrative_sections": [
+    {
+      "heading": "Company Focus Areas",
+      "bullets": [
+        "Enhancing AI Assistant Capabilities: Glean is focused on upgrading its AI assistant to be more proactive, customizable, and capable of executing tasks across various enterprise tools.",
+        "Integrating AI Deeply into Enterprise Operations: Glean aims to transition from a simple search tool to a comprehensive AI framework that integrates large language models with enterprise data to enhance decision-making processes."
+      ],
+      "sources": [
+        "thelettertwo.com +1 more"
+      ]
+    },
+    {
+      "heading": "Hiring And Headcount",
+      "paragraphs": [
+        "Significant growth in sales: The Sales department has seen a 42% increase in headcount over the past year.",
+        "Expansion in engineering: The Engineering department has grown by 31% over the past year."
+      ]
+    },
+    {
+      "heading": "Competitors Summary",
+      "paragraphs": [
+        "Glean Technologies operates in a highly competitive AI platform market, focusing on enterprise search and knowledge management.",
+        "The company faces significant competition from established players like Kore.ai, Copilot Studio, and Microsoft Fabric."
+      ],
+      "sources": [
+        "noxus.ai +2 more"
+      ]
+    }
+  ],
+  "metric_tables": [
+    {
+      "title": "Total Job Openings",
+      "note": "Based on LinkedIn data. Excludes subsidiaries.",
+      "columns": [
+        "Function",
+        "Number of employees",
+        "Percentage of total headcount",
+        "3 month growth",
+        "6 month growth"
+      ],
+      "rows": [
+        {
+          "label": "Sales",
+          "values": {
+            "Number of employees": "78",
+            "Percentage of total headcount": "32",
+            "3 month growth": "42% increase",
+            "6 month growth": "44% increase"
+          }
+        },
+        {
+          "label": "Engineering",
+          "values": {
+            "Number of employees": "56",
+            "Percentage of total headcount": "23",
+            "3 month growth": "8% increase",
+            "6 month growth": "17% increase"
+          }
+        },
+        {
+          "label": "Product Management",
+          "values": {
+            "Number of employees": "22",
+            "Percentage of total headcount": "9",
+            "3 month growth": "16% increase",
+            "6 month growth": "38% increase"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Employee Distribution And Headcount Growth By Function",
+      "note": "Based on LinkedIn data.",
+      "columns": [
+        "Function",
+        "Number of employees",
+        "Percentage of total headcount",
+        "6 month growth",
+        "1 year growth"
+      ],
+      "rows": [
+        {
+          "label": "Engineering",
+          "values": {
+            "Number of employees": "509",
+            "Percentage of total headcount": "32",
+            "6 month growth": "14% increase",
+            "1 year growth": "53% increase"
+          }
+        },
+        {
+          "label": "Sales",
+          "values": {
+            "Number of employees": "330",
+            "Percentage of total headcount": "21",
+            "6 month growth": "19% increase",
+            "1 year growth": "47% increase"
+          }
+        },
+        {
+          "label": "Information Technology",
+          "values": {
+            "Number of employees": "89",
+            "Percentage of total headcount": "6",
+            "6 month growth": "28% increase",
+            "1 year growth": "96% increase"
+          }
+        }
+      ]
+    }
+  ],
+  "time_series": [
+    {
+      "title": "Total Employee Count Time Series",
+      "note": "Based on LinkedIn data.",
+      "points": [
+        {
+          "label": "2024-04",
+          "value": "531"
+        },
+        {
+          "label": "2024-10",
+          "value": "758"
+        },
+        {
+          "label": "2025-04",
+          "value": "1,031"
+        },
+        {
+          "label": "2025-10",
+          "value": "1,332"
+        },
+        {
+          "label": "2026-04",
+          "value": "1,593"
+        }
+      ]
+    }
+  ],
+  "notable_alumni": [
+    {
+      "name": "Katy Abbaszadeh",
+      "degree": "3rd",
+      "current_role": "VP Revenue Marketing at Cursor",
+      "previous_role": "Previously VP of Global Demand Gen, Events, and Field Marketing at Glean"
+    },
+    {
+      "name": "Jonathan Marriott",
+      "degree": "3rd",
+      "current_role": "Member at Pavilion",
+      "previous_role": "Previously RVP EMEA at Glean"
+    },
+    {
+      "name": "Neboysa Omcikus",
+      "degree": "3rd",
+      "current_role": "COO at Goodfire",
+      "previous_role": "Previously VP, Strategy and Operations at Glean"
+    }
+  ],
+  "notes": [
+    "This example is based on a LinkedIn company insights page reached from a job posting.",
+    "The schema is intentionally generic and should also work for other sources if equivalent data exists."
+  ]
+}

@@ -24,6 +24,7 @@
 - [ ] Collect jobs from one source
 - [ ] Normalize captured data
 - [x] Define first browser-capture milestone as `extracted sections -> jd.md`
+- [x] Define a generic `company_profile` capture shape for company-level insights and premium pages
 - [ ] Run template-based fit analysis
 - [ ] Save suitable roles to Notion
 - [ ] Send notification summary
@@ -71,3 +72,6 @@ Current capture progress:
 - capture text-normalization layer is intended to stay generic across LinkedIn, Indeed, MeeBoss, YC, Glassdoor, and similar sources
 - `src/job_search_assistant/capture/jd_markdown.py` now renders structured sections into a reusable markdown JD
 - `scripts/render_jd_markdown.py` provides a thin CLI for turning captured section JSON into `jd.md`
+- `docs/company-profile-capture.md` now defines a separate company-level capture spec for embedded profile cards and full insights pages
+- `src/job_search_assistant/capture/company_profile.py` now provides a generic `company_profile` schema, markdown renderer, and cache payload split
+- `scripts/render_company_profile.py` can turn one loosely structured company profile JSON into markdown and optional cache rows

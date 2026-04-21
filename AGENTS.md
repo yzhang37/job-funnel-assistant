@@ -34,6 +34,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - When a website has no reliable API, browser automation is acceptable. Prefer robust selectors and explicit retry logic.
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
 - For the first browser capture milestone, prefer a minimal output: convert extracted page content into `jd.md` before expanding to full packet/attachment workflows.
+- Company profile capture should remain source-agnostic. The stable output should be `company_profile.json` / `company_profile.md`, while source-specific behavior such as LinkedIn Premium Insights belongs in optional capture strategies rather than the core schema.
 - Keep browser capture source-agnostic where practical. Avoid assuming LinkedIn-only fields, fixed screenshot counts, or platform-specific packet shapes unless a task explicitly calls for it.
 - Preserve the user's templates and wording where possible; avoid rewriting them unless asked.
 
@@ -50,6 +51,7 @@ Common expected commands once implemented:
 - analyze one job: `python3 scripts/analyze_job_fit.py --job <job.json> --profile <profile.json> --pretty`
 - run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <mock|openai>`
 - render jd markdown: `python3 scripts/render_jd_markdown.py --input <capture.json> --output <jd.md>`
+- render company profile markdown: `python3 scripts/render_company_profile.py --input <profile.json> --output <company_profile.md>`
 - validate cache layer: `python3 -m py_compile src/job_search_assistant/cache/*.py`
 - run app: `TBD`
 - run automation: `TBD`

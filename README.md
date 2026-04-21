@@ -84,6 +84,7 @@
 ├── automations/
 ├── config/
 ├── data/
+│   ├── cache/
 │   ├── processed/
 │   └── raw/
 ├── docs/
@@ -92,6 +93,7 @@
 ├── prompts/
 ├── scripts/
 │   ├── analyze_job_fit.py
+│   ├── render_company_profile.py
 │   ├── render_jd_markdown.py
 │   ├── run_job_funnel_analysis.py
 │   └── prepare_wolai_import.py
@@ -124,6 +126,13 @@
 
 这样后续不管是 `Computer Use`、其他 agent，还是手工补充内容，都能先把最核心的 JD 文本层稳定落地。
 
+公司画像这一层现在也单独建模了：
+
+- 岗位页里的 company profile / premium insight 不再硬塞进 `jd.md`
+- 改为单独输出 `company_profile.md`
+- 这层既支持岗位页内嵌摘要，也支持完整的 company insights 页面
+- 如果某个平台存在“高级洞察 / premium insights”，这层允许抓更完整的表格、趋势和 alumni 信息
+
 ## 模板文件
 
 - `templates/analysis_template.md`: 粘贴你的岗位分析模板
@@ -142,9 +151,12 @@
 - `profiles/patches/`: 近期简历更新或特殊补丁
 - `scripts/run_job_funnel_analysis.py`: 新的主入口
 - `scripts/render_jd_markdown.py`: 将 capture 得到的结构化 section 渲染成 `jd.md`
+- `scripts/render_company_profile.py`: 将公司画像 capture 渲染成 `company_profile.md`，并可选写入缓存
 - `examples/jd_example.md`: 示例 JD
+- `examples/company_profile_example.json`: 示例公司画像输入
 - `src/job_search_assistant/cache/`: 配置驱动的缓存策略与 SQLite 存储
 - `src/job_search_assistant/capture/`: browser capture 的最小文本整理层
+- `docs/company-profile-capture.md`: company profile capture spec
 
 ## 当前可运行命令
 
@@ -221,6 +233,38 @@ python3 scripts/render_jd_markdown.py \
   - 平台专属字段全部齐全
 - 这层的输入格式是“宽松 section 文本”，不是 LinkedIn 专属 schema
 
+4. 浏览器抓取第二阶段：整理成 `company_profile.md`
+
+```bash
+python3 scripts/render_company_profile.py \
+  --input examples/company_profile_example.json \
+  --output examples/company_profile_example.md
+```
+
+可选同时写缓存：
+
+```bash
+python3 scripts/render_company_profile.py \
+  --input examples/company_profile_example.json \
+  --url https://www.linkedin.com/company/gleanwork/insights/?insightType=HEADCOUNT \
+  --cache-db data/cache/job_search.sqlite3 \
+  --print-cache-summary
+```
+
+这一步的定位：
+
+- 输入：一个宽松的 company profile capture JSON
+- 核心入口可以只靠 `source_url`
+- 输出：`company_profile.md`
+- 可选把公司静态资料和动态洞察分别写入缓存
+- 如果来源页面存在 premium / advanced insights，这层允许承接更完整的表格和时间序列
+
+注意：
+
+- 当前 Python 代码还没有直接驱动 `Computer Use`
+- 真正的 `URL -> 打开浏览器 -> 点开 Premium Insights -> 抓取内容` 仍属于下一阶段浏览器驱动层
+- 当前代码层已经先把“统一 schema / markdown 产物 / cache 落点”准备好了
+
 ## Cache Layer
 
 仓库现在内置了一个轻量缓存层，目标是给后续的 capture agent 和 analyzer 复用公司级/岗位级快照数据。
@@ -247,6 +291,19 @@ python3 scripts/render_jd_markdown.py \
 - `capture_artifact` 基本按归档处理
 
 这不是写死逻辑，只是 `config/cache_policy.toml` 里的初始配置。后续你可以按字段继续细化，比如单独给 `total_employees`、`job_openings_total`、`notable_alumni` 配不同 TTL。
+
+## Company Profile Capture Spec
+
+`company_profile` 这层的设计原则：
+
+- URL 是入口，但 schema 不绑死某个平台
+- narrative sections、metric tables、time series、bridge signals 分开保存
+- `company_profile_static` 与 `company_insights` 分 namespace 缓存
+- 遇到 `Show Premium Insights` 一类入口时，优先进入完整 insights 页抓更结构化的数据
+
+更完整说明见：
+
+- [docs/company-profile-capture.md](/Users/l/Projects/找工作/docs/company-profile-capture.md)
 
 ## 下一步
 
