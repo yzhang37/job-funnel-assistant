@@ -25,6 +25,12 @@
 - [ ] Normalize captured data
 - [x] Define first browser-capture milestone as `extracted sections -> jd.md`
 - [x] Define a generic `company_profile` capture shape for company-level insights and premium pages
+- [x] Define LinkedIn company resolution strategy: canonical company link -> cached slug -> direct insights URL -> search fallback
+- [x] Validate direct LinkedIn `/company/<slug>/insights/` access on a real company page and confirm block variability across companies
+- [x] Define public capture interfaces: `job link -> bundle` and `company name -> bundle`
+- [x] Add first bundle/manifest writer for normalized capture artifacts
+- [x] Define multi-source company enrichment rule: source-native insights -> LinkedIn insights -> official site / careers -> other public sources
+- [x] Upgrade `company_profile` output to preserve maximal evidence instead of only summary fields
 - [ ] Run template-based fit analysis
 - [ ] Save suitable roles to Notion
 - [ ] Send notification summary
@@ -73,5 +79,12 @@ Current capture progress:
 - `src/job_search_assistant/capture/jd_markdown.py` now renders structured sections into a reusable markdown JD
 - `scripts/render_jd_markdown.py` provides a thin CLI for turning captured section JSON into `jd.md`
 - `docs/company-profile-capture.md` now defines a separate company-level capture spec for embedded profile cards and full insights pages
+- `docs/linkedin-company-resolution.md` now defines when to jump directly to LinkedIn company insights and when to fall back to company-name search
+- real-page validation now confirms `jackandjillai/insights/` is reachable directly and exposes premium metrics such as total employee count and function distribution
+- real-page validation also confirms that `Insights` blocks vary by company, so capture should treat openings/alumni/affiliated-pages sections as optional
 - `src/job_search_assistant/capture/company_profile.py` now provides a generic `company_profile` schema, markdown renderer, and cache payload split
 - `scripts/render_company_profile.py` can turn one loosely structured company profile JSON into markdown and optional cache rows
+- `docs/capture-bundle-spec.md` now defines the stable handoff format: bundle directory + manifest + normalized markdown/json artifacts
+- `scripts/build_job_capture_bundle.py` and `scripts/build_company_profile_bundle.py` now expose the first standardized output layer for downstream analyzer/storage/notifier usage
+- `company_profile` schema now supports `source_snapshots`, so one company profile can preserve site-native signals, LinkedIn insights, and official-site evidence side by side
+- `company_profile` schema now also preserves `related_pages`, `available_signals`, `missing_signals`, and `raw_sections`, so the first capture program keeps as much analyzer-relevant evidence as possible

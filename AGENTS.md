@@ -35,6 +35,11 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
 - For the first browser capture milestone, prefer a minimal output: convert extracted page content into `jd.md` before expanding to full packet/attachment workflows.
 - Company profile capture should remain source-agnostic. The stable output should be `company_profile.json` / `company_profile.md`, while source-specific behavior such as LinkedIn Premium Insights belongs in optional capture strategies rather than the core schema.
+- Public capture should converge on two entrypoints: `job link -> bundle` and `company name -> bundle`. Bundle output is the stable handoff format for analyzer, storage, and notification layers.
+- For LinkedIn enrichment, prefer canonical company links already exposed on the page. Recommended resolution order: company URL from current page -> cached slug/url mapping -> direct `/company/<slug>/insights/` URL -> LinkedIn search fallback.
+- If the source site itself exposes company-level insights, capture those first, then enrich with LinkedIn when available, then official site / careers. Preserve source attribution instead of flattening everything into one unlabeled blob.
+- Do not over-prune company profile output before it reaches the analyzer. Prefer maximal evidence preservation: normalized summary fields plus rich tables, time series, related pages, source snapshots, available signals, missing signals, and raw sections whenever they exist.
+- LinkedIn `Insights` pages are high-value but not uniform. Treat blocks such as `Total employee count`, `Employee distribution by function`, `Total job openings`, `Notable alumni`, and `Affiliated pages` as optional sections rather than guaranteed fields.
 - Keep browser capture source-agnostic where practical. Avoid assuming LinkedIn-only fields, fixed screenshot counts, or platform-specific packet shapes unless a task explicitly calls for it.
 - Preserve the user's templates and wording where possible; avoid rewriting them unless asked.
 
@@ -52,6 +57,8 @@ Common expected commands once implemented:
 - run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <mock|openai>`
 - render jd markdown: `python3 scripts/render_jd_markdown.py --input <capture.json> --output <jd.md>`
 - render company profile markdown: `python3 scripts/render_company_profile.py --input <profile.json> --output <company_profile.md>`
+- build job capture bundle: `python3 scripts/build_job_capture_bundle.py --job-input <job.json> --output-dir <bundle_dir>`
+- build company profile bundle: `python3 scripts/build_company_profile_bundle.py --input <company_profile.json> --output-dir <bundle_dir>`
 - validate cache layer: `python3 -m py_compile src/job_search_assistant/cache/*.py`
 - run app: `TBD`
 - run automation: `TBD`

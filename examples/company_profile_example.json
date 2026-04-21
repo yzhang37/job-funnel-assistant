@@ -190,8 +190,102 @@
       "previous_role": "Previously VP, Strategy and Operations at Glean"
     }
   ],
+  "related_pages": [
+    {
+      "label": "Amazon",
+      "url": "https://www.linkedin.com/company/amazon/",
+      "relationship": "parent",
+      "source": "linkedin"
+    },
+    {
+      "label": "Amazon Web Services (AWS)",
+      "url": "https://www.linkedin.com/company/amazon-web-services/",
+      "relationship": "related platform",
+      "source": "linkedin"
+    }
+  ],
+  "available_signals": [
+    "total employee count",
+    "employee distribution by function",
+    "job openings by function",
+    "notable alumni",
+    "featured customers",
+    "company focus areas"
+  ],
+  "missing_signals": [
+    "verified sponsorship policy",
+    "official hiring manager identity"
+  ],
+  "raw_sections": [
+    {
+      "heading": "LinkedIn Competitors Block",
+      "text": "Glean Technologies operates in a highly competitive AI platform market, focusing on enterprise search and knowledge management. The company faces significant competition from established players like Kore.ai, Copilot Studio, and Microsoft Fabric.",
+      "source_label": "linkedin_insights"
+    }
+  ],
+  "source_snapshots": [
+    {
+      "label": "LinkedIn Insights",
+      "source_kind": "linkedin_insights",
+      "source_platform": "linkedin",
+      "source_url": "https://www.linkedin.com/company/gleanwork/insights/?insightType=HEADCOUNT",
+      "headline_metrics": {
+        "total_employees": "1,593",
+        "company_growth_2y": "200% increase",
+        "engineering_growth_2y": "106% increase"
+      },
+      "available_signals": [
+        "total employee count",
+        "employee distribution by function",
+        "job openings by function",
+        "notable alumni"
+      ],
+      "missing_signals": [
+        "named hiring managers"
+      ],
+      "related_pages": [
+        {
+          "label": "Amazon",
+          "url": "https://www.linkedin.com/company/amazon/",
+          "relationship": "parent"
+        }
+      ],
+      "raw_sections": [
+        {
+          "heading": "Hiring & Headcount",
+          "text": "Significant growth in sales: The Sales department has seen a 42% increase in headcount over the past year. Expansion in engineering: The Engineering department has grown by 31% over the past year.",
+          "source_label": "linkedin_insights"
+        }
+      ],
+      "notes": [
+        "Default high-priority enrichment source when LinkedIn company insights is available."
+      ]
+    },
+    {
+      "label": "Official Website",
+      "source_kind": "official_site",
+      "source_platform": "glean.com",
+      "source_url": "https://www.glean.com/",
+      "narrative_sections": [
+        {
+          "heading": "Official Messaging",
+          "paragraphs": [
+            "The Work AI platform connected to all your company data. Find, create, and automate anything."
+          ]
+        }
+      ],
+      "available_signals": [
+        "official tagline",
+        "official product positioning"
+      ],
+      "notes": [
+        "Official site complements LinkedIn; it should not replace richer LinkedIn headcount and openings signals."
+      ]
+    }
+  ],
   "notes": [
     "This example is based on a LinkedIn company insights page reached from a job posting.",
-    "The schema is intentionally generic and should also work for other sources if equivalent data exists."
+    "The schema is intentionally generic and should also work for other sources if equivalent data exists.",
+    "If the source job board also exposes company-specific insights, capture those first and preserve them alongside LinkedIn and official-site enrichment instead of overwriting them."
   ]
 }

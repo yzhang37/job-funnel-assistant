@@ -93,6 +93,8 @@
 ├── prompts/
 ├── scripts/
 │   ├── analyze_job_fit.py
+│   ├── build_company_profile_bundle.py
+│   ├── build_job_capture_bundle.py
 │   ├── render_company_profile.py
 │   ├── render_jd_markdown.py
 │   ├── run_job_funnel_analysis.py
@@ -133,6 +135,86 @@
 - 这层既支持岗位页内嵌摘要，也支持完整的 company insights 页面
 - 如果某个平台存在“高级洞察 / premium insights”，这层允许抓更完整的表格、趋势和 alumni 信息
 
+公司画像 enrichment 的默认顺序现在定成：
+
+1. 先抓来源站自己的 company signals
+2. 如果能解析到 LinkedIn，就默认补抓 LinkedIn company page / insights
+3. 再补官网和官方 careers
+4. 最后才是其他公开网页
+
+而且这些来源不应该互相覆盖。现在 `company_profile` schema 已经支持 `source_snapshots`，用来同时保存：
+
+- source-native signals
+- linkedin signals
+- official signals
+- other signals
+
+并且当前的方向是不做过早裁剪。第一程序输出的 `company_profile` 应尽量多保留：
+
+- normalized summary fields
+- metric tables
+- time series
+- related pages
+- available signals
+- missing signals
+- raw sections
+- source snapshots
+
+这样 analyzer 以后拿到的不是“几条摘要”，而是一份高密度证据包。
+
+如果 enrichment 目标是 LinkedIn，公司解析的推荐顺序是：
+
+1. 先吃当前页面已经暴露的 LinkedIn company link
+2. 再查本地缓存过的 slug / company URL
+3. 已知 slug 时直接跳 `/company/<slug>/insights/`
+4. 只有前面都没有时，才走 LinkedIn 搜索公司名
+
+这样做的原因：
+
+- 比搜索更省点击
+- 比猜 slug 更稳
+- 更适合后续自动化
+- 同一家公司可以长期复用缓存
+
+这条路径现在已经做过一次真实验证：
+
+- `Jack & Jill`
+- canonical page: `https://www.linkedin.com/company/jackandjillai`
+- direct insights page: `https://www.linkedin.com/company/jackandjillai/insights/`
+
+这次实测确认：
+
+- 已知 slug 时，直接跳 `/company/<slug>/insights/` 是有效路径
+- 页面能直接暴露 `Total employee count`
+- 页面能直接暴露 `Employee distribution and headcount growth by function`
+- 还可能出现 `Affiliated pages` 这种对产品/品牌结构有帮助的块
+- 但不是每家公司都会暴露完全相同的 block，所以 openings、alumni、affiliated pages 都应该视为 optional sections
+
+现在总 pipeline 的公开输出也开始收口成两个接口：
+
+1. `job link -> bundle`
+   - 目标产物：
+     - `jd.md`
+     - `job_posting.json`
+     - `company_profile.md`
+     - `company_profile.json`
+     - `manifest.json`
+     - 可选 `attachments/`
+2. `company name -> bundle`
+   - 目标产物：
+     - `company_profile.md`
+     - `company_profile.json`
+     - `manifest.json`
+     - 可选 `attachments/`
+
+这里的 bundle 是目录包，不强制一开始就 zip。
+
+这样做的好处是：
+
+- analyzer、Telegram、Notion、缓存都围绕同一个 handoff format
+- 以后接 Computer Use 或别的 agent，不需要再重新定义输出协议
+- 附件数量和文件名都可以保持松散，不需要写死
+
 ## 模板文件
 
 - `templates/analysis_template.md`: 粘贴你的岗位分析模板
@@ -152,11 +234,14 @@
 - `scripts/run_job_funnel_analysis.py`: 新的主入口
 - `scripts/render_jd_markdown.py`: 将 capture 得到的结构化 section 渲染成 `jd.md`
 - `scripts/render_company_profile.py`: 将公司画像 capture 渲染成 `company_profile.md`，并可选写入缓存
+- `scripts/build_job_capture_bundle.py`: 生成标准化 job bundle
+- `scripts/build_company_profile_bundle.py`: 生成标准化 company profile bundle
 - `examples/jd_example.md`: 示例 JD
 - `examples/company_profile_example.json`: 示例公司画像输入
 - `src/job_search_assistant/cache/`: 配置驱动的缓存策略与 SQLite 存储
 - `src/job_search_assistant/capture/`: browser capture 的最小文本整理层
 - `docs/company-profile-capture.md`: company profile capture spec
+- `docs/capture-bundle-spec.md`: bundle / manifest / 两个公开接口说明
 
 ## 当前可运行命令
 
@@ -258,12 +343,51 @@ python3 scripts/render_company_profile.py \
 - 输出：`company_profile.md`
 - 可选把公司静态资料和动态洞察分别写入缓存
 - 如果来源页面存在 premium / advanced insights，这层允许承接更完整的表格和时间序列
+- 同时支持 `source_snapshots`，把原站、LinkedIn、官网等来源分开保留
+- 同时支持 `related_pages`、`available_signals`、`missing_signals`、`raw_sections`
+- 目标是让第一程序输出给 analyzer 的 company profile 尽可能完整，而不是先缩水成摘要
+
+5. 生成 job capture bundle：
+
+```bash
+python3 scripts/build_job_capture_bundle.py \
+  --job-input examples/browser_capture_sections.example.json \
+  --company-profile-input examples/company_profile_example.json \
+  --output-dir data/raw/example-job-bundle
+```
+
+6. 生成 company profile bundle：
+
+```bash
+python3 scripts/build_company_profile_bundle.py \
+  --input examples/company_profile_example.json \
+  --output-dir data/raw/example-company-bundle
+```
+
+这两条命令当前的定位：
+
+- 先把标准 bundle 输出 contract 固定下来
+- 浏览器驱动层后续只负责把抓到的数据喂给 bundle writer
+- 暂时还不是“给一个 URL 就自动抓完”的最终版本
 
 注意：
 
 - 当前 Python 代码还没有直接驱动 `Computer Use`
 - 真正的 `URL -> 打开浏览器 -> 点开 Premium Insights -> 抓取内容` 仍属于下一阶段浏览器驱动层
 - 当前代码层已经先把“统一 schema / markdown 产物 / cache 落点”准备好了
+
+未来如果这层接上浏览器驱动，推荐的 enrichment 入口顺序也已经定下来了：
+
+- `job page company link`
+- `cached company url / slug`
+- `direct insights url`
+- `linkedin search fallback`
+
+而且当前已知：
+
+- `direct insights url` 已经在真实公司页上验证过可行
+- 不能把 `Total job openings` 当成必有字段
+- `Total employee count` 和 `function distribution` 目前看更像高价值、高命中率块
 
 ## Cache Layer
 
@@ -292,6 +416,16 @@ python3 scripts/render_company_profile.py \
 
 这不是写死逻辑，只是 `config/cache_policy.toml` 里的初始配置。后续你可以按字段继续细化，比如单独给 `total_employees`、`job_openings_total`、`notable_alumni` 配不同 TTL。
 
+另外，后续建议单独增加一个 company resolver mapping cache，至少记录：
+
+- `company_name`
+- `linkedin_company_slug`
+- `linkedin_company_url`
+- `linkedin_insights_url`
+- `resolved_via`
+- `resolved_at`
+- `confidence`
+
 ## Company Profile Capture Spec
 
 `company_profile` 这层的设计原则：
@@ -300,10 +434,13 @@ python3 scripts/render_company_profile.py \
 - narrative sections、metric tables、time series、bridge signals 分开保存
 - `company_profile_static` 与 `company_insights` 分 namespace 缓存
 - 遇到 `Show Premium Insights` 一类入口时，优先进入完整 insights 页抓更结构化的数据
+- 对 LinkedIn `Insights` 页要按 optional blocks 设计，不要求每家公司都出现同样的表或卡片
 
 更完整说明见：
 
 - [docs/company-profile-capture.md](/Users/l/Projects/找工作/docs/company-profile-capture.md)
+- [docs/linkedin-company-resolution.md](/Users/l/Projects/找工作/docs/linkedin-company-resolution.md)
+- [docs/capture-bundle-spec.md](/Users/l/Projects/找工作/docs/capture-bundle-spec.md)
 
 ## 下一步
 

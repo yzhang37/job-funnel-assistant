@@ -51,6 +51,43 @@ class NotableAlumnus:
 
 
 @dataclass
+class CompanyRelatedPage:
+    label: str
+    url: str | None = None
+    relationship: str | None = None
+    source: str | None = None
+    note: str | None = None
+
+
+@dataclass
+class CompanyRawSection:
+    heading: str
+    text: str
+    source_label: str | None = None
+    note: str | None = None
+
+
+@dataclass
+class CompanySourceSnapshot:
+    label: str
+    source_url: str | None = None
+    source_platform: str | None = None
+    source_kind: str | None = None
+    headline_metrics: dict[str, Any] = field(default_factory=dict)
+    bridge_signals: list[str] = field(default_factory=list)
+    competitor_names: list[str] = field(default_factory=list)
+    narrative_sections: list[CompanyNarrativeSection] = field(default_factory=list)
+    metric_tables: list[CompanyMetricTable] = field(default_factory=list)
+    time_series: list[CompanyTimeSeries] = field(default_factory=list)
+    notable_alumni: list[NotableAlumnus] = field(default_factory=list)
+    related_pages: list[CompanyRelatedPage] = field(default_factory=list)
+    available_signals: list[str] = field(default_factory=list)
+    missing_signals: list[str] = field(default_factory=list)
+    raw_sections: list[CompanyRawSection] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass
 class CompanyProfileContent:
     company_name: str
     source_url: str
@@ -70,6 +107,11 @@ class CompanyProfileContent:
     metric_tables: list[CompanyMetricTable] = field(default_factory=list)
     time_series: list[CompanyTimeSeries] = field(default_factory=list)
     notable_alumni: list[NotableAlumnus] = field(default_factory=list)
+    related_pages: list[CompanyRelatedPage] = field(default_factory=list)
+    available_signals: list[str] = field(default_factory=list)
+    missing_signals: list[str] = field(default_factory=list)
+    raw_sections: list[CompanyRawSection] = field(default_factory=list)
+    source_snapshots: list[CompanySourceSnapshot] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
     @classmethod
@@ -77,76 +119,13 @@ class CompanyProfileContent:
         company_name = _required_text(payload.get("company_name"), "company_name")
         source_url = _required_text(payload.get("source_url"), "source_url")
 
-        sections: list[CompanyNarrativeSection] = []
-        for raw in payload.get("narrative_sections", payload.get("sections", [])):
-            sections.append(
-                CompanyNarrativeSection(
-                    heading=str(raw.get("heading", "")).strip(),
-                    paragraphs=[_clean_text(item) for item in raw.get("paragraphs", []) if _clean_text(item)],
-                    bullets=[_clean_text(item) for item in raw.get("bullets", []) if _clean_text(item)],
-                    sources=[_clean_text(item) for item in raw.get("sources", []) if _clean_text(item)],
-                )
-            )
-
-        metric_tables: list[CompanyMetricTable] = []
-        for raw_table in payload.get("metric_tables", []):
-            rows = []
-            for raw_row in raw_table.get("rows", []):
-                rows.append(
-                    CompanyMetricRow(
-                        label=str(raw_row.get("label", "")).strip(),
-                        values={
-                            str(key).strip(): str(value).strip()
-                            for key, value in raw_row.get("values", {}).items()
-                            if str(key).strip() and str(value).strip()
-                        },
-                    )
-                )
-            metric_tables.append(
-                CompanyMetricTable(
-                    title=str(raw_table.get("title", "")).strip(),
-                    columns=[_clean_text(item) for item in raw_table.get("columns", []) if _clean_text(item)],
-                    rows=rows,
-                    note=_optional_text(raw_table.get("note")),
-                )
-            )
-
-        time_series: list[CompanyTimeSeries] = []
-        for raw_series in payload.get("time_series", []):
-            points = []
-            for raw_point in raw_series.get("points", []):
-                label = _clean_text(raw_point.get("label"))
-                value = _clean_text(raw_point.get("value"))
-                if not label or not value:
-                    continue
-                points.append(
-                    TimeSeriesPoint(
-                        label=label,
-                        value=value,
-                        note=_optional_text(raw_point.get("note")),
-                    )
-                )
-            time_series.append(
-                CompanyTimeSeries(
-                    title=str(raw_series.get("title", "")).strip(),
-                    points=points,
-                    note=_optional_text(raw_series.get("note")),
-                )
-            )
-
-        notable_alumni: list[NotableAlumnus] = []
-        for raw in payload.get("notable_alumni", []):
-            name = _clean_text(raw.get("name"))
-            if not name:
-                continue
-            notable_alumni.append(
-                NotableAlumnus(
-                    name=name,
-                    degree=_optional_text(raw.get("degree")),
-                    current_role=_optional_text(raw.get("current_role")),
-                    previous_role=_optional_text(raw.get("previous_role")),
-                )
-            )
+        sections = _parse_narrative_sections(payload.get("narrative_sections", payload.get("sections", [])))
+        metric_tables = _parse_metric_tables(payload.get("metric_tables", []))
+        time_series = _parse_time_series(payload.get("time_series", []))
+        notable_alumni = _parse_notable_alumni(payload.get("notable_alumni", []))
+        related_pages = _parse_related_pages(payload.get("related_pages", []))
+        raw_sections = _parse_raw_sections(payload.get("raw_sections", []))
+        source_snapshots = _parse_source_snapshots(payload.get("source_snapshots", []))
 
         source_platform = _optional_text(payload.get("source_platform")) or detect_source_platform(source_url)
 
@@ -173,6 +152,11 @@ class CompanyProfileContent:
             metric_tables=metric_tables,
             time_series=time_series,
             notable_alumni=notable_alumni,
+            related_pages=related_pages,
+            available_signals=[_clean_text(item) for item in payload.get("available_signals", []) if _clean_text(item)],
+            missing_signals=[_clean_text(item) for item in payload.get("missing_signals", []) if _clean_text(item)],
+            raw_sections=raw_sections,
+            source_snapshots=source_snapshots,
             notes=[_clean_text(item) for item in payload.get("notes", []) if _clean_text(item)],
         )
 
@@ -259,6 +243,119 @@ class CompanyProfileContent:
                     "previous_role": alumnus.previous_role,
                 }
                 for alumnus in self.notable_alumni
+            ]
+        if self.related_pages:
+            insight_fields["related_pages"] = [
+                {
+                    "label": page.label,
+                    "url": page.url,
+                    "relationship": page.relationship,
+                    "source": page.source,
+                    "note": page.note,
+                }
+                for page in self.related_pages
+                if page.label
+            ]
+        if self.available_signals:
+            insight_fields["available_signals"] = self.available_signals
+        if self.missing_signals:
+            insight_fields["missing_signals"] = self.missing_signals
+        if self.raw_sections:
+            insight_fields["raw_sections"] = [
+                {
+                    "heading": section.heading,
+                    "text": section.text,
+                    "source_label": section.source_label,
+                    "note": section.note,
+                }
+                for section in self.raw_sections
+                if section.heading or section.text
+            ]
+        if self.source_snapshots:
+            insight_fields["source_snapshots"] = [
+                {
+                    "label": snapshot.label,
+                    "source_url": snapshot.source_url,
+                    "source_platform": snapshot.source_platform,
+                    "source_kind": snapshot.source_kind,
+                    "headline_metrics": snapshot.headline_metrics,
+                    "bridge_signals": snapshot.bridge_signals,
+                    "competitor_names": snapshot.competitor_names,
+                    "narrative_sections": [
+                        {
+                            "heading": section.heading,
+                            "paragraphs": section.paragraphs,
+                            "bullets": section.bullets,
+                            "sources": section.sources,
+                        }
+                        for section in snapshot.narrative_sections
+                        if section.heading
+                    ],
+                    "metric_tables": [
+                        {
+                            "title": table.title,
+                            "columns": table.columns,
+                            "rows": [
+                                {
+                                    "label": row.label,
+                                    "values": row.values,
+                                }
+                                for row in table.rows
+                                if row.label
+                            ],
+                            "note": table.note,
+                        }
+                        for table in snapshot.metric_tables
+                        if table.title
+                    ],
+                    "time_series": [
+                        {
+                            "title": series.title,
+                            "points": [
+                                {"label": point.label, "value": point.value, "note": point.note}
+                                for point in series.points
+                            ],
+                            "note": series.note,
+                        }
+                        for series in snapshot.time_series
+                        if series.title
+                    ],
+                    "notable_alumni": [
+                        {
+                            "name": alumnus.name,
+                            "degree": alumnus.degree,
+                            "current_role": alumnus.current_role,
+                            "previous_role": alumnus.previous_role,
+                        }
+                        for alumnus in snapshot.notable_alumni
+                    ],
+                    "related_pages": [
+                        {
+                            "label": page.label,
+                            "url": page.url,
+                            "relationship": page.relationship,
+                            "source": page.source,
+                            "note": page.note,
+                        }
+                        for page in snapshot.related_pages
+                        if page.label
+                    ],
+                    "available_signals": snapshot.available_signals,
+                    "missing_signals": snapshot.missing_signals,
+                    "raw_sections": [
+                        {
+                            "heading": section.heading,
+                            "text": section.text,
+                            "source_label": section.source_label,
+                            "note": section.note,
+                        }
+                        for section in snapshot.raw_sections
+                        if section.heading or section.text
+                    ],
+                    "notes": snapshot.notes,
+                }
+                for snapshot in self.source_snapshots
+                if snapshot.label
             ]
 
         return {
@@ -394,6 +491,131 @@ def render_company_profile_markdown(profile: CompanyProfileContent) -> str:
             lines.append(f"- {' | '.join(parts)}")
         lines.append("")
 
+    if profile.related_pages:
+        lines.append("## Related Pages")
+        lines.append("")
+        for page in profile.related_pages:
+            parts = [page.label]
+            if page.relationship:
+                parts.append(f"relationship: {page.relationship}")
+            if page.source:
+                parts.append(f"source: {page.source}")
+            if page.url:
+                parts.append(page.url)
+            if page.note:
+                parts.append(f"note: {page.note}")
+            lines.append(f"- {' | '.join(parts)}")
+        lines.append("")
+
+    if profile.available_signals:
+        lines.append("## Available Signals")
+        lines.append("")
+        for signal in profile.available_signals:
+            lines.append(f"- {signal}")
+        lines.append("")
+
+    if profile.missing_signals:
+        lines.append("## Missing Signals")
+        lines.append("")
+        for signal in profile.missing_signals:
+            lines.append(f"- {signal}")
+        lines.append("")
+
+    if profile.raw_sections:
+        lines.append("## Raw Sections")
+        lines.append("")
+        for section in profile.raw_sections:
+            title = section.heading or "Untitled"
+            lines.append(f"### {title}")
+            lines.append("")
+            if section.source_label:
+                lines.append(f"- Source: {section.source_label}")
+            if section.note:
+                lines.append(f"- Note: {section.note}")
+            if section.source_label or section.note:
+                lines.append("")
+            lines.append(section.text)
+            lines.append("")
+
+    if profile.source_snapshots:
+        lines.append("## Source Snapshots")
+        lines.append("")
+        for snapshot in profile.source_snapshots:
+            if not snapshot.label:
+                continue
+            lines.append(f"### {snapshot.label}")
+            lines.append("")
+            snapshot_meta = []
+            if snapshot.source_kind:
+                snapshot_meta.append(f"- 类型: {snapshot.source_kind}")
+            if snapshot.source_platform:
+                snapshot_meta.append(f"- 平台: {snapshot.source_platform}")
+            if snapshot.source_url:
+                snapshot_meta.append(f"- 链接: {snapshot.source_url}")
+            if snapshot_meta:
+                lines.extend(snapshot_meta)
+                lines.append("")
+            if snapshot.headline_metrics:
+                for key, value in snapshot.headline_metrics.items():
+                    lines.append(f"- {humanize_metric_name(key)}: {value}")
+                lines.append("")
+            for item in snapshot.bridge_signals:
+                lines.append(f"- Bridge signal: {item}")
+            if snapshot.bridge_signals:
+                lines.append("")
+            for name in snapshot.competitor_names:
+                lines.append(f"- Competitor: {name}")
+            if snapshot.competitor_names:
+                lines.append("")
+            for section in snapshot.narrative_sections:
+                if not section.heading:
+                    continue
+                lines.append(f"- Section: {section.heading}")
+            if snapshot.narrative_sections:
+                lines.append("")
+            for table in snapshot.metric_tables:
+                if not table.title:
+                    continue
+                lines.append(f"- Table: {table.title}")
+            if snapshot.metric_tables:
+                lines.append("")
+            for series in snapshot.time_series:
+                if not series.title:
+                    continue
+                lines.append(f"- Time series: {series.title}")
+            if snapshot.time_series:
+                lines.append("")
+            for alumnus in snapshot.notable_alumni:
+                lines.append(f"- Alumnus: {alumnus.name}")
+            if snapshot.notable_alumni:
+                lines.append("")
+            for page in snapshot.related_pages:
+                parts = [page.label]
+                if page.relationship:
+                    parts.append(page.relationship)
+                if page.url:
+                    parts.append(page.url)
+                lines.append(f"- Related page: {' | '.join(parts)}")
+            if snapshot.related_pages:
+                lines.append("")
+            for signal in snapshot.available_signals:
+                lines.append(f"- Available signal: {signal}")
+            if snapshot.available_signals:
+                lines.append("")
+            for signal in snapshot.missing_signals:
+                lines.append(f"- Missing signal: {signal}")
+            if snapshot.missing_signals:
+                lines.append("")
+            for section in snapshot.raw_sections:
+                title = section.heading or "Untitled"
+                lines.append(f"- Raw section: {title}")
+            if snapshot.raw_sections:
+                lines.append("")
+            for note in snapshot.notes:
+                lines.append(f"- Note: {note}")
+            if snapshot.notes:
+                lines.append("")
+
     if profile.notes:
         lines.append("## Capture Notes")
         lines.append("")
@@ -435,6 +657,160 @@ def detect_source_platform(url: str | None) -> str | None:
 def humanize_metric_name(metric_name: str) -> str:
     text = metric_name.replace("_", " ").strip()
     return text[:1].upper() + text[1:] if text else metric_name
+
+
+def _parse_narrative_sections(values: list[dict[str, Any]]) -> list[CompanyNarrativeSection]:
+    sections: list[CompanyNarrativeSection] = []
+    for raw in values:
+        sections.append(
+            CompanyNarrativeSection(
+                heading=str(raw.get("heading", "")).strip(),
+                paragraphs=[_clean_text(item) for item in raw.get("paragraphs", []) if _clean_text(item)],
+                bullets=[_clean_text(item) for item in raw.get("bullets", []) if _clean_text(item)],
+                sources=[_clean_text(item) for item in raw.get("sources", []) if _clean_text(item)],
+            )
+        )
+    return sections
+
+
+def _parse_metric_tables(values: list[dict[str, Any]]) -> list[CompanyMetricTable]:
+    metric_tables: list[CompanyMetricTable] = []
+    for raw_table in values:
+        rows = []
+        for raw_row in raw_table.get("rows", []):
+            rows.append(
+                CompanyMetricRow(
+                    label=str(raw_row.get("label", "")).strip(),
+                    values={
+                        str(key).strip(): str(value).strip()
+                        for key, value in raw_row.get("values", {}).items()
+                        if str(key).strip() and str(value).strip()
+                    },
+                )
+            )
+        metric_tables.append(
+            CompanyMetricTable(
+                title=str(raw_table.get("title", "")).strip(),
+                columns=[_clean_text(item) for item in raw_table.get("columns", []) if _clean_text(item)],
+                rows=rows,
+                note=_optional_text(raw_table.get("note")),
+            )
+        )
+    return metric_tables
+
+
+def _parse_time_series(values: list[dict[str, Any]]) -> list[CompanyTimeSeries]:
+    time_series: list[CompanyTimeSeries] = []
+    for raw_series in values:
+        points = []
+        for raw_point in raw_series.get("points", []):
+            label = _clean_text(raw_point.get("label"))
+            value = _clean_text(raw_point.get("value"))
+            if not label or not value:
+                continue
+            points.append(
+                TimeSeriesPoint(
+                    label=label,
+                    value=value,
+                    note=_optional_text(raw_point.get("note")),
+                )
+            )
+        time_series.append(
+            CompanyTimeSeries(
+                title=str(raw_series.get("title", "")).strip(),
+                points=points,
+                note=_optional_text(raw_series.get("note")),
+            )
+        )
+    return time_series
+
+
+def _parse_notable_alumni(values: list[dict[str, Any]]) -> list[NotableAlumnus]:
+    notable_alumni: list[NotableAlumnus] = []
+    for raw in values:
+        name = _clean_text(raw.get("name"))
+        if not name:
+            continue
+        notable_alumni.append(
+            NotableAlumnus(
+                name=name,
+                degree=_optional_text(raw.get("degree")),
+                current_role=_optional_text(raw.get("current_role")),
+                previous_role=_optional_text(raw.get("previous_role")),
+            )
+        )
+    return notable_alumni
+
+
+def _parse_related_pages(values: list[dict[str, Any]]) -> list[CompanyRelatedPage]:
+    related_pages: list[CompanyRelatedPage] = []
+    for raw in values:
+        label = _clean_text(raw.get("label"))
+        if not label:
+            continue
+        related_pages.append(
+            CompanyRelatedPage(
+                label=label,
+                url=_optional_text(raw.get("url")),
+                relationship=_optional_text(raw.get("relationship")),
+                source=_optional_text(raw.get("source")),
+                note=_optional_text(raw.get("note")),
+            )
+        )
+    return related_pages
+
+
+def _parse_raw_sections(values: list[dict[str, Any]]) -> list[CompanyRawSection]:
+    raw_sections: list[CompanyRawSection] = []
+    for raw in values:
+        heading = _clean_text(raw.get("heading"))
+        text = _clean_text(raw.get("text"))
+        if not heading and not text:
+            continue
+        raw_sections.append(
+            CompanyRawSection(
+                heading=heading,
+                text=text,
+                source_label=_optional_text(raw.get("source_label")),
+                note=_optional_text(raw.get("note")),
+            )
+        )
+    return raw_sections
+
+
+def _parse_source_snapshots(values: list[dict[str, Any]]) -> list[CompanySourceSnapshot]:
+    snapshots: list[CompanySourceSnapshot] = []
+    for raw in values:
+        label = _clean_text(raw.get("label"))
+        if not label:
+            continue
+        source_url = _optional_text(raw.get("source_url"))
+        source_platform = _optional_text(raw.get("source_platform")) or detect_source_platform(source_url)
+        snapshots.append(
+            CompanySourceSnapshot(
+                label=label,
+                source_url=source_url,
+                source_platform=source_platform,
+                source_kind=_optional_text(raw.get("source_kind")),
+                headline_metrics={
+                    str(key).strip(): value
+                    for key, value in raw.get("headline_metrics", {}).items()
+                    if str(key).strip()
+                },
+                bridge_signals=[_clean_text(item) for item in raw.get("bridge_signals", []) if _clean_text(item)],
+                competitor_names=[_clean_text(item) for item in raw.get("competitor_names", []) if _clean_text(item)],
+                narrative_sections=_parse_narrative_sections(raw.get("narrative_sections", raw.get("sections", []))),
+                metric_tables=_parse_metric_tables(raw.get("metric_tables", [])),
+                time_series=_parse_time_series(raw.get("time_series", [])),
+                notable_alumni=_parse_notable_alumni(raw.get("notable_alumni", [])),
+                related_pages=_parse_related_pages(raw.get("related_pages", [])),
+                available_signals=[_clean_text(item) for item in raw.get("available_signals", []) if _clean_text(item)],
+                missing_signals=[_clean_text(item) for item in raw.get("missing_signals", []) if _clean_text(item)],
+                raw_sections=_parse_raw_sections(raw.get("raw_sections", [])),
+                notes=[_clean_text(item) for item in raw.get("notes", []) if _clean_text(item)],
+            )
+        )
+    return snapshots
 
 
 def _required_text(value: Any, field_name: str) -> str:
