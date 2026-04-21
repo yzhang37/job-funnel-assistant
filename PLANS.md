@@ -23,6 +23,7 @@
 
 - [ ] Collect jobs from one source
 - [ ] Normalize captured data
+- [x] Define first browser-capture milestone as `extracted sections -> jd.md`
 - [ ] Run template-based fit analysis
 - [ ] Save suitable roles to Notion
 - [ ] Send notification summary
@@ -63,3 +64,10 @@ Current analyzer progress:
 - `profiles/` now separates stable candidate background, preferences, work authorization, and resume patches
 - `config/cache_policy.toml` now controls cache TTL defaults and field-level overrides without hardcoding policy in Python
 - `src/job_search_assistant/cache/` provides a lightweight SQLite-backed cache store for reusable company/job snapshot data
+
+Current capture progress:
+
+- first capture requirement is intentionally narrow: organize extracted browser content into `jd.md`
+- capture text-normalization layer is intended to stay generic across LinkedIn, Indeed, MeeBoss, YC, Glassdoor, and similar sources
+- `src/job_search_assistant/capture/jd_markdown.py` now renders structured sections into a reusable markdown JD
+- `scripts/render_jd_markdown.py` provides a thin CLI for turning captured section JSON into `jd.md`

@@ -1,0 +1,60 @@
+{
+  "title": "Backend Engineer, Music",
+  "company": "Spotify",
+  "location": "New York, NY",
+  "source_platform": "browser_capture",
+  "source_url": "https://www.linkedin.com/jobs/view/4391714211/",
+  "signals": [
+    "Verified job",
+    "Reposted 2 days ago",
+    "Over 100 people clicked apply",
+    "Promoted by hirer",
+    "Responses managed off LinkedIn"
+  ],
+  "sections": [
+    {
+      "heading": "About the job",
+      "paragraphs": [
+        "In the Music Mission, we build the tools and services that enable creators to express themselves, promote their work, and connect with fans. Discovery Mode is a key promotional tool that helps artists, labels, and licensors grow their audience while maintaining a high-quality listener experience.",
+        "We are looking for a backend-focused engineer to join the OASIS team. OASIS builds and operates the systems that power promotion delivery and optimization within Discovery Mode. Our work ensures that promotional content is intelligently allocated by balancing complex, competing objectives across the ecosystem.",
+        "The team is distributed and highly collaborative, working closely with Personalization (PZN) to serve high-quality promotion signals. You will be part of a small, impactful group of engineers across data and machine learning, owning a core piece of infrastructure that enables promotion delivery at scale."
+      ]
+    },
+    {
+      "heading": "What You'll Do",
+      "bullets": [
+        "Own and evolve backend systems that deliver promotion scores to personalization systems",
+        "Build and maintain services that support promotion allocation and delivery at scale",
+        "Collaborate closely with machine learning engineers and data engineers to improve signal quality and system performance",
+        "Contribute to system design decisions that impact a critical part of the discovery ecosystem",
+        "Improve reliability, scalability, and observability of existing infrastructure"
+      ]
+    },
+    {
+      "heading": "Who You Are",
+      "bullets": [
+        "You have experience building backend systems using Java or similar languages",
+        "You are comfortable working across systems and are interested in learning beyond pure backend, such as data or ML systems",
+        "You are driven to leverage AI to improve systems and eager to find practical ways to apply it",
+        "You have experience with or exposure to Scala, Python, or data / ML workflows"
+      ]
+    },
+    {
+      "heading": "Where You'll Be",
+      "bullets": [
+        "You can be within the North America region as long as the employer has a work location there",
+        "This team operates within the Eastern Standard time zone for collaboration"
+      ]
+    }
+  ],
+  "compensation_text": "The United States base range for this position is $132,949 - $189,927 plus equity.",
+  "benefits": [
+    "Health insurance",
+    "401(k)",
+    "Paid parental leave"
+  ],
+  "notes": [
+    "This example happens to come from LinkedIn, but the formatter is designed for generic browser-captured section text.",
+    "Other platforms can omit fields or supply different section headings."
+  ]
+}

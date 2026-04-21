@@ -33,6 +33,8 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Design around replaceable integrations. Notion and Telegram are preferred initial targets, but avoid coupling core logic to any one provider.
 - When a website has no reliable API, browser automation is acceptable. Prefer robust selectors and explicit retry logic.
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
+- For the first browser capture milestone, prefer a minimal output: convert extracted page content into `jd.md` before expanding to full packet/attachment workflows.
+- Keep browser capture source-agnostic where practical. Avoid assuming LinkedIn-only fields, fixed screenshot counts, or platform-specific packet shapes unless a task explicitly calls for it.
 - Preserve the user's templates and wording where possible; avoid rewriting them unless asked.
 
 ## Commands
@@ -47,6 +49,7 @@ Common expected commands once implemented:
 
 - analyze one job: `python3 scripts/analyze_job_fit.py --job <job.json> --profile <profile.json> --pretty`
 - run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <mock|openai>`
+- render jd markdown: `python3 scripts/render_jd_markdown.py --input <capture.json> --output <jd.md>`
 - validate cache layer: `python3 -m py_compile src/job_search_assistant/cache/*.py`
 - run app: `TBD`
 - run automation: `TBD`

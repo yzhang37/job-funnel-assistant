@@ -92,6 +92,7 @@
 ├── prompts/
 ├── scripts/
 │   ├── analyze_job_fit.py
+│   ├── render_jd_markdown.py
 │   ├── run_job_funnel_analysis.py
 │   └── prepare_wolai_import.py
 ├── src/
@@ -114,6 +115,15 @@
 - 候选人画像需要独立插拔，不能绑死在单个 prompt 文本里
 - 后续接 Notion、通知、抓取脚本时，这个 analyzer 仍然可以保持单独部件
 
+当前 browser capture 的第一阶段目标非常克制：
+
+- 先不追求完整 packet
+- 先不强绑定截图数量
+- 先把浏览器里提取到的结构化内容整理成一个干净的 `jd.md`
+- 这层默认按跨平台设计，不先绑定 LinkedIn / Indeed / MeeBoss / YC / Glassdoor 的专属字段
+
+这样后续不管是 `Computer Use`、其他 agent，还是手工补充内容，都能先把最核心的 JD 文本层稳定落地。
+
 ## 模板文件
 
 - `templates/analysis_template.md`: 粘贴你的岗位分析模板
@@ -131,8 +141,10 @@
 - `profiles/work_auth/`: visa / sponsorship / clearance 相关可插拔层
 - `profiles/patches/`: 近期简历更新或特殊补丁
 - `scripts/run_job_funnel_analysis.py`: 新的主入口
+- `scripts/render_jd_markdown.py`: 将 capture 得到的结构化 section 渲染成 `jd.md`
 - `examples/jd_example.md`: 示例 JD
 - `src/job_search_assistant/cache/`: 配置驱动的缓存策略与 SQLite 存储
+- `src/job_search_assistant/capture/`: browser capture 的最小文本整理层
 
 ## 当前可运行命令
 
@@ -190,6 +202,24 @@ profile stack 的意义：
 - `patches`: 最近简历补丁、求职策略补丁
 
 更新这些内容时，不需要改 analyzer spec，只需要替换或追加 profile fragment。
+
+3. 浏览器抓取第一阶段：整理成 `jd.md`
+
+```bash
+python3 scripts/render_jd_markdown.py \
+  --input examples/browser_capture_sections.example.json \
+  --output examples/browser_capture_sections.example.md
+```
+
+这一步的定位：
+
+- 输入：浏览器里已经提取到的结构化 section 文本
+- 输出：一个适合后续分析、存档、复用的 `jd.md`
+- 暂时不要求：
+  - 完整 job packet
+  - 固定数量截图
+  - 平台专属字段全部齐全
+- 这层的输入格式是“宽松 section 文本”，不是 LinkedIn 专属 schema
 
 ## Cache Layer
 
