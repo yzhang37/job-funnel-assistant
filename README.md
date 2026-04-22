@@ -21,14 +21,12 @@
 
 当前推荐的主流程：
 
-1. Tracker Scheduler 定期访问你配置好的 job trackers
-2. 只发现新的 job links
-3. Manual Intake 也可以直接把 `job link` / `JD 文本` / 附件送进 Capture Program
-4. Capture Program 抓 JD 和公司画像，并输出 bundle
-5. Analyzer 按你的模板分析匹配度
-6. 写入 Notion 数据库
-7. 发送消息提醒
-8. 你确认后再决定是否投递
+1. `Tracker` 定期访问你配置好的 job trackers
+2. `Manual Intake` 也可以直接把 `job link` / `JD 文本` / 附件送进系统
+3. `Capture` 抓 JD 和公司画像，并输出 bundle
+4. `Analyzer` 按你的模板分析匹配度
+5. `Output` 把结果写入 Notion，并回复 Telegram
+6. 你确认后再决定是否投递
 
 ## 为什么这样设计
 
@@ -86,7 +84,11 @@ Manual Intake 需要支持的 payload：
 
 当前全局链路应该理解成：
 
-- `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`
+- `Tracker / Manual Intake -> Capture -> Analyzer -> Output`
+
+更精确的表述是：
+
+- `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer` -> `Output`
 
 这里的关键点是：
 
@@ -94,6 +96,10 @@ Manual Intake 需要支持的 payload：
 - `Manual Intake` 只接收人工输入
 - `Capture` 同时负责抓取和输出 bundle，bundle 不是单独业务节点
 - `Analyzer` 才负责判断 `主攻 / 备胎 / 放弃`
+- `Output` 负责把 Analyzer 的结果真正交付给你：
+  - 写入 Notion 分析页
+  - 回复 Telegram 短消息
+  - 在 Telegram 中附上 Notion 页面链接
 
 ## Manual Intake 渠道优先级
 
@@ -186,10 +192,10 @@ Manual Intake 需要支持的 payload：
 当前仓库已经能跑通这条手动链路：
 
 1. 输入一段 `JD 文本`，或输入 `岗位链接 + JD 文本`
-2. Capture 生成 bundle
-3. Analyzer 生成结构化结果和完整 markdown 报告
-4. 自动在 `🧠 分析报告库` 中创建一条 Notion 页面
-5. 自动发送一条 Telegram 短消息，并带上 Notion 页面链接
+2. `Capture` 生成 bundle
+3. `Analyzer` 生成结构化结果和完整 markdown 报告
+4. `Output` 自动在 `🧠 分析报告库` 中创建一条 Notion 页面
+5. `Output` 自动发送一条 Telegram 短消息，并带上 Notion 页面链接
 
 手动单次运行脚本：
 

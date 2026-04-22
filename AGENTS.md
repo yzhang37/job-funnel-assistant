@@ -29,7 +29,12 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 ## Working Style
 
 - Prefer incremental delivery over large one-shot builds.
-- Keep the pipeline modular: tracker scheduler, capture, analyzer, storage, notifier.
+- Keep the pipeline modular around five named components:
+  - `Tracker`
+  - `Manual Intake`
+  - `Capture`
+  - `Analyzer`
+  - `Output`
 - Design around replaceable integrations. Notion and Telegram are preferred initial targets, but avoid coupling core logic to any one provider.
 - Distinguish clearly between background intake and manual intake. Background intake is tracker-driven and scheduled; manual intake is user-driven and should accept arbitrary job links, JD text, and attachments.
 - Treat Telegram as the preferred manual intake channel for mobile-first use. Email forward is a secondary/manual fallback rather than the primary interactive surface.
@@ -49,8 +54,16 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - For the first browser capture milestone, prefer a minimal output: convert extracted page content into `jd.md` before expanding to full packet/attachment workflows.
 - Company profile capture should remain source-agnostic. The stable output should be `company_profile.json` / `company_profile.md`, while source-specific behavior such as LinkedIn Premium Insights belongs in optional capture strategies rather than the core schema.
 - Public capture should converge on two entrypoints: `job link -> bundle` and `company name -> bundle`. Bundle output is the stable handoff format for analyzer, storage, and notification layers.
-- System-level node model should stay explicit: `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`.
+- System-level node model should stay explicit:
+  - `Tracker / Manual Intake -> Capture -> Analyzer -> Output`
+  - More precisely:
+    - `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer` -> `Output`
 - Manual intake should expose one user-facing entry that accepts multiple payload types: `job_url`, `jd_text`, optional `attachments`, optional `company_name`, and optional `notes`. Different channels should not fork the downstream pipeline.
+- `Output` is a first-class system component. It receives analyzer results and decides how to render and route them, for example:
+  - write/update the Notion analysis page
+  - send the Telegram short reply
+  - attach the Notion page link in the Telegram response
+- `Output` is not responsible for tracker dedupe, capture retries, or analyzer caching. Those belong to upstream execution layers.
 - For LinkedIn enrichment, prefer canonical company links already exposed on the page. Recommended resolution order: company URL from current page -> cached slug/url mapping -> direct `/company/<slug>/insights/` URL -> LinkedIn search fallback.
 - If the source site itself exposes company-level insights, capture those first, then enrich with LinkedIn when available, then official site / careers. Preserve source attribution instead of flattening everything into one unlabeled blob.
 - Do not over-prune company profile output before it reaches the analyzer. Prefer maximal evidence preservation: normalized summary fields plus rich tables, time series, related pages, source snapshots, available signals, missing signals, and raw sections whenever they exist.
@@ -121,3 +134,9 @@ Initial focus:
 5. choose and wire a message notification channel
 6. build a tracker-first discovery loop: trackers -> new job links -> capture -> analyzer
 7. validate the first real LinkedIn tracker execution path: click result cards, derive canonical JD links, and keep analysis out of the scheduler
+8. keep the five-component framing stable across docs and code:
+   - `Tracker`
+   - `Manual Intake`
+   - `Capture`
+   - `Analyzer`
+   - `Output`

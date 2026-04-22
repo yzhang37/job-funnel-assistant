@@ -11,6 +11,12 @@
 - [x] Clarify manual intake payloads: `job_url`, `jd_text`, attachments, company name, notes
 - [x] Clarify manual intake channel priority: Telegram first, email forward second, share sheet/web intake later
 - [x] Clarify system node model: `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`
+- [x] Clarify five-component system model:
+  - `Tracker`
+  - `Manual Intake`
+  - `Capture`
+  - `Analyzer`
+  - `Output`
 - [x] Clarify execution assumption: both `Tracker` and `Capture` require `Computer Use` in the current design
 - [x] Create first standalone job-fit analyzer component
 - [x] Build LLM-driven Job Funnel / Resume Fit Analyst runner
@@ -143,7 +149,9 @@ Current intake-layer progress:
   - share sheet / shortcuts and a lightweight web form as later enhancements
 - source channels should converge into one internal request shape rather than fork the downstream capture/analyzer pipeline
 - node boundary is now explicit:
-  - `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`
+  - `Tracker / Manual Intake -> Capture -> Analyzer -> Output`
+  - more precisely:
+    - `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer` -> `Output`
 - current execution assumption is also explicit:
   - `Tracker` requires `Computer Use`
   - `Capture` requires `Computer Use`
@@ -154,6 +162,21 @@ Current intake-layer progress:
 - current manual chain can already do:
   - input `JD 文本`
   - or input `岗位链接 + JD 文本`
-  - then `Capture -> Analyzer -> Notion -> Telegram`
+  - then `Capture -> Analyzer -> Output`
+
+Current output-layer progress:
+
+- `Output` is now treated as a first-class component instead of an implementation afterthought
+- current first runnable output path is:
+  - create a Notion analysis page in `🧠 分析报告库`
+  - send a Telegram short result
+  - include the Notion page link in that Telegram reply
+- `Output` currently handles delivery only:
+  - rendering analyzer results into user-facing forms
+  - routing those forms to Notion and Telegram
+- `Output` does not own:
+  - tracker discovery dedupe
+  - capture retries
+  - analyzer cache policy
 - current manual chain still cannot do:
   - `纯 job_url` 自动触发 live browser capture

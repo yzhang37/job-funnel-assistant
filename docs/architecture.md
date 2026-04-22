@@ -2,20 +2,28 @@
 
 ## Proposed Pipeline
 
-1. Scheduled tracker intake
-2. Manual intake
-3. Capture (outputs bundle)
-4. Fit analyzer
-5. Notion writer
-6. Notification sender
+1. `Tracker`
+2. `Manual Intake`
+3. `Capture`
+4. `Analyzer`
+5. `Output`
+
+Canonical chain:
+
+- `Tracker / Manual Intake -> Capture -> Analyzer -> Output`
+
+More precise chain:
+
+- `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer` -> `Output`
 
 Current first runnable manual chain:
 
 1. `Manual intake (JD text or URL + JD text)`
 2. `Capture (outputs bundle)`
 3. `Analyzer`
-4. `Notion writer`
-5. `Telegram short-result sender`
+4. `Output`
+   - `Notion writer`
+   - `Telegram short-result sender`
 
 ## Intake Layer
 
@@ -68,7 +76,11 @@ Current first implemented manual-intake constraint:
 
 The system-level node model should stay explicit:
 
-- `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`
+- `Tracker / Manual Intake -> Capture -> Analyzer -> Output`
+
+More precisely:
+
+- `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer` -> `Output`
 
 Interpretation:
 
@@ -76,6 +88,7 @@ Interpretation:
 - `Manual Intake` accepts arbitrary incoming job material
 - `Capture` is one node: it fetches, normalizes, and emits the bundle
 - `Analyzer` is one node: it consumes evidence and decides fit
+- `Output` is one node: it renders analyzer results into user-facing artifacts and routes them to the chosen delivery surfaces
 
 ## Collector Strategy
 
@@ -103,6 +116,20 @@ Interpretation:
 - Company profile output should bias toward maximal evidence preservation rather than early summarization. Analyzer-facing handoff should retain summary metrics, tables, time series, related pages, available/missing signals, source snapshots, and raw captured blocks whenever possible.
 
 ## Notification Strategy
+
+`Output` is the system component that owns result delivery.
+
+It is responsible for:
+
+- rendering analyzer output into a Notion page payload
+- rendering analyzer output into a Telegram short message
+- attaching the Notion page link to the Telegram reply
+
+It is not responsible for:
+
+- tracker discovery dedupe
+- capture retries
+- analyzer caching or reruns
 
 Preferred initial channel: Telegram
 
