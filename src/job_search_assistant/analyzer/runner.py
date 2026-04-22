@@ -34,6 +34,8 @@ def run_analysis(
     special_questions: str | None = None,
     image_paths: list[str] | None = None,
     notes: str | None = None,
+    company_profile_payload: dict[str, Any] | None = None,
+    bundle_manifest: dict[str, Any] | None = None,
 ) -> RunResult:
     loaded_profile = load_profile_stack(repo_root, profile_stack_path, extra_profile_fragments)
     packet = build_job_packet(
@@ -43,6 +45,8 @@ def run_analysis(
         special_questions=special_questions,
         image_paths=image_paths,
         notes=notes,
+        company_profile_payload=company_profile_payload,
+        bundle_manifest=bundle_manifest,
     )
     developer_prompt = _build_developer_prompt(repo_root, loaded_profile.combined_markdown, analysis_mode)
     user_text = _build_user_text(packet, loaded_profile.fragments)

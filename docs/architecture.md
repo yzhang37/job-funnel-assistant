@@ -9,6 +9,14 @@
 5. Notion writer
 6. Notification sender
 
+Current first runnable manual chain:
+
+1. `Manual intake (JD text or URL + JD text)`
+2. `Capture (outputs bundle)`
+3. `Analyzer`
+4. `Notion writer`
+5. `Telegram short-result sender`
+
 ## Intake Layer
 
 The system should expose two top-level intake families:
@@ -47,6 +55,14 @@ Preferred channel priority:
 4. Lightweight web intake page
 
 All manual channels should map into the same internal request shape. Channel differences should not fork the downstream capture/analyzer logic.
+
+Current first implemented manual-intake constraint:
+
+- supported:
+  - `jd_text`
+  - `job_url + jd_text`
+- not yet supported:
+  - `job_url` only, when that would require live browser capture
 
 ## Node Boundary
 
@@ -104,6 +120,21 @@ Fallbacks:
 - lightweight web intake page
 - local summary dashboard
 - thread automation follow-up inside Codex
+
+Current first runnable output path:
+
+- always create a Notion analysis page in `🧠 分析报告库`
+- send a Telegram short message that includes:
+  - 决策结论
+  - 核心理由
+  - 风险
+  - `JD` 链接
+  - `Notion` 分析页链接
+
+## Secrets TODO
+
+- TODO: the current local-development assumption is that secrets can live in a local file such as `.env.local`.
+- TODO: if this system graduates to long-running automation, multi-machine execution, or cloud deployment, move secrets out of local flat files and into a managed secrets system such as AWS Secrets Manager.
 
 ## Current Capture Shape
 

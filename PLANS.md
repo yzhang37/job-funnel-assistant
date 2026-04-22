@@ -43,9 +43,9 @@
 - [x] Add first bundle/manifest writer for normalized capture artifacts
 - [x] Define multi-source company enrichment rule: source-native insights -> LinkedIn insights -> official site / careers -> other public sources
 - [x] Upgrade `company_profile` output to preserve maximal evidence instead of only summary fields
-- [ ] Run template-based fit analysis
-- [ ] Save suitable roles to Notion
-- [ ] Send notification summary
+- [x] Run template-based fit analysis for the first manual-intake chain
+- [x] Save analysis output to Notion for the first manual-intake chain
+- [x] Send Telegram short-result output for the first manual-intake chain
 - [ ] Validate with dry-run output
 
 ## Phase 3: Automation
@@ -54,10 +54,11 @@
 - [ ] Add retry and failure logging
 - [ ] Add manual review checkpoints
 - [ ] Add source-specific collectors
-- [ ] Add Telegram manual intake entry
+- [x] Add Telegram manual intake entry
 - [ ] Add email-forward intake entry
 - [ ] Add share-sheet / shortcut intake bridge
 - [ ] Add lightweight web intake page
+- [ ] TODO: migrate local secrets handling to a more secure runtime-managed solution if the system moves beyond single-machine local use (for example AWS Secrets Manager)
 
 ## Notes
 
@@ -146,3 +147,13 @@ Current intake-layer progress:
 - current execution assumption is also explicit:
   - `Tracker` requires `Computer Use`
   - `Capture` requires `Computer Use`
+- first Telegram manual-intake script now exists:
+  - `scripts/process_telegram_manual_intake.py`
+- first manual end-to-end runner now exists:
+  - `scripts/run_manual_intake_once.py`
+- current manual chain can already do:
+  - input `JD 文本`
+  - or input `岗位链接 + JD 文本`
+  - then `Capture -> Analyzer -> Notion -> Telegram`
+- current manual chain still cannot do:
+  - `纯 job_url` 自动触发 live browser capture

@@ -114,6 +114,11 @@ Manual Intake 需要支持的 payload：
 - 交互即时
 - 支持任意混合输入
 - 后续还能直接回推摘要和分析结果
+- 当前第一版已验证：
+  - `JD 文本`
+  - `岗位链接 + JD 文本`
+- 当前第一版仍未接入：
+  - `纯岗位链接` 直接自动抓网页再分析
 
 ### 2. Email Forward
 
@@ -176,6 +181,44 @@ Manual Intake 需要支持的 payload：
 - Tracker 需要自动打开搜索结果页、点卡片、翻页、拿 canonical JD link
 - Capture 需要自动打开岗位页、展开内容、进入 company / insights 页面并收集证据
 
+## 当前已打通的最短人工链路
+
+当前仓库已经能跑通这条手动链路：
+
+1. 输入一段 `JD 文本`，或输入 `岗位链接 + JD 文本`
+2. Capture 生成 bundle
+3. Analyzer 生成结构化结果和完整 markdown 报告
+4. 自动在 `🧠 分析报告库` 中创建一条 Notion 页面
+5. 自动发送一条 Telegram 短消息，并带上 Notion 页面链接
+
+手动单次运行脚本：
+
+```bash
+python3 scripts/run_manual_intake_once.py \
+  --text-file /tmp/manual_input.txt \
+  --source-channel telegram \
+  --provider auto \
+  --write-notion \
+  --send-telegram
+```
+
+如果要处理真实 Telegram bot 收到的消息：
+
+```bash
+python3 scripts/process_telegram_manual_intake.py --provider auto
+```
+
+当前 Telegram manual intake 的限制：
+
+- 支持 `JD 文本`
+- 支持 `岗位链接 + JD 文本`
+- 暂不支持 `纯岗位链接` 自动触发 live browser capture
+
+TODO:
+
+- 当前本地开发可以先使用仓库根目录下的 `.env.local` 保存本地 secrets。
+- 如果后续进入长期运行、多机部署或云环境，建议把 Telegram / Notion / OpenAI 等凭证迁移到更安全的 secrets 管理方案，例如 AWS Secrets Manager。
+
 ### 2. 岗位管理
 
 推荐先用 Notion 作为岗位中台，记录：
@@ -231,12 +274,17 @@ Manual Intake 需要支持的 payload：
 │   ├── normalize_job_links.py
 │   ├── prepare_tracker_discovery_batch.py
 │   ├── record_tracker_discovery.py
+│   ├── process_telegram_manual_intake.py
 │   ├── render_company_profile.py
 │   ├── render_jd_markdown.py
 │   ├── run_job_funnel_analysis.py
+│   ├── run_manual_intake_once.py
+│   ├── send_telegram_message.py
 │   └── prepare_wolai_import.py
 ├── src/
 │   └── job_search_assistant/
+│       ├── integrations/
+│       ├── runtime/
 │       └── tracker_scheduler/
 └── templates/
 ```
@@ -406,6 +454,9 @@ Manual Intake 需要支持的 payload：
 - `scripts/render_company_profile.py`: 将公司画像 capture 渲染成 `company_profile.md`，并可选写入缓存
 - `scripts/build_job_capture_bundle.py`: 生成标准化 job bundle
 - `scripts/build_company_profile_bundle.py`: 生成标准化 company profile bundle
+- `scripts/run_manual_intake_once.py`: 运行一条 manual intake，并完成 Capture -> Analyzer -> Notion -> Telegram
+- `scripts/process_telegram_manual_intake.py`: 拉取 Telegram bot updates，并按 manual intake 流程处理
+- `scripts/send_telegram_message.py`: 从 `.env.local` 读取 bot 凭证，发送一条 Telegram 消息
 - `scripts/list_due_trackers.py`: 列出当前应该运行的 trackers
 - `scripts/normalize_job_links.py`: 把浏览器里拿到的 LinkedIn / Indeed 原始 URL 规范化成稳定 JD link
 - `scripts/prepare_tracker_discovery_batch.py`: 把浏览器会话里观察到的一批原始 URL 转成“哪些是新的 JD link”

@@ -24,9 +24,11 @@ class JobPacket:
     special_questions: str | None
     image_paths: list[Path]
     notes: str | None
+    company_profile_payload: dict[str, object] | None = None
+    bundle_manifest: dict[str, object] | None = None
 
     def to_payload(self) -> dict[str, object]:
-        return {
+        payload = {
             "company_name": self.company_name,
             "guessed_title": self.guessed_title,
             "job_url": self.job_url,
@@ -35,6 +37,11 @@ class JobPacket:
             "attached_image_paths": [str(path) for path in self.image_paths],
             "notes": self.notes,
         }
+        if self.company_profile_payload is not None:
+            payload["company_profile"] = self.company_profile_payload
+        if self.bundle_manifest is not None:
+            payload["bundle_manifest"] = self.bundle_manifest
+        return payload
 
 
 def build_job_packet(
@@ -45,6 +52,8 @@ def build_job_packet(
     special_questions: str | None = None,
     image_paths: list[str] | None = None,
     notes: str | None = None,
+    company_profile_payload: dict[str, object] | None = None,
+    bundle_manifest: dict[str, object] | None = None,
 ) -> JobPacket:
     resolved_images = [Path(path).resolve() for path in (image_paths or [])]
     return JobPacket(
@@ -55,6 +64,8 @@ def build_job_packet(
         special_questions=special_questions.strip() if special_questions else None,
         image_paths=resolved_images,
         notes=notes.strip() if notes else None,
+        company_profile_payload=company_profile_payload,
+        bundle_manifest=bundle_manifest,
     )
 
 
@@ -90,4 +101,3 @@ def write_json(path: str | Path, payload: dict[str, object]) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-

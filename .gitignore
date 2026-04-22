@@ -12,3 +12,5 @@ __pycache__/
 examples/reports/
 data/cache/
 *.sqlite3
+data/raw/manual_intake/
+data/processed/telegram_manual_state.json
