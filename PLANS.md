@@ -91,6 +91,12 @@ Current analyzer progress:
 - current version is rules-based and ready to be aligned with the user's real analysis template
 - `prompts/job_funnel_resume_fit_analyst_spec.md` stores the user's analyzer spec without rewriting its framework
 - `scripts/run_job_funnel_analysis.py` can run one JD through a profile stack and render the fixed report format
+- analyzer provider routing now supports:
+  - `codex`
+  - `openai`
+  - `mock`
+- `provider=auto` now prefers local `Codex` execution first, which is the intended default for a single-machine local workflow
+- `OPENAI_API_KEY` is now treated as optional fallback rather than the default analyzer path
 - `profiles/` now separates stable candidate background, preferences, work authorization, and resume patches
 - `config/cache_policy.toml` now controls cache TTL defaults and field-level overrides without hardcoding policy in Python
 - `src/job_search_assistant/cache/` provides a lightweight SQLite-backed cache store for reusable company/job snapshot data
@@ -163,6 +169,9 @@ Current intake-layer progress:
   - input `JD 文本`
   - or input `岗位链接 + JD 文本`
   - then `Capture -> Analyzer -> Output`
+- Telegram manual intake owner guard is now part of the expected baseline:
+  - only configured owner chat/user messages should be processed
+  - bot-authored replies and messages from other chats/users should be ignored
 
 Current output-layer progress:
 
@@ -178,5 +187,7 @@ Current output-layer progress:
   - tracker discovery dedupe
   - capture retries
   - analyzer cache policy
+- first real local Codex chain has now been validated:
+  - `Manual Intake -> Capture -> Codex Analyzer -> Notion -> Telegram`
 - current manual chain still cannot do:
   - `纯 job_url` 自动触发 live browser capture

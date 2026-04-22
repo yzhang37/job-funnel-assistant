@@ -28,8 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Process one Telegram manual-intake message end-to-end.")
     parser.add_argument("--state-file", default="data/processed/telegram_manual_state.json")
     parser.add_argument("--profile-stack", default="profiles/default_stack.json")
-    parser.add_argument("--provider", choices=["auto", "openai", "mock"], default="auto")
-    parser.add_argument("--model", default="gpt-5.2")
+    parser.add_argument("--provider", choices=["auto", "codex", "openai", "mock"], default="auto")
+    parser.add_argument("--model", default="gpt-5.4")
     parser.add_argument("--analysis-mode", choices=["quick", "full"], default="full")
     parser.add_argument("--enable-web-search", action="store_true")
     parser.add_argument("--bundle-root", default="data/raw/manual_intake")
@@ -52,6 +52,10 @@ def main() -> None:
     notion = None if args.dry_run else NotionAnalysisReportClient()
 
     for message in updates:
+        if not telegram.is_owner_message(message):
+            state["last_update_id"] = message.update_id
+            _save_state(state_path, state)
+            continue
         request = parse_manual_intake_text(message.text, source_channel="telegram")
         if not request.jd_text:
             reply = "这条消息目前只有链接，没有 JD 正文。当前 manual intake 先支持“JD 文本”或“URL + JD 文本”一起输入。"

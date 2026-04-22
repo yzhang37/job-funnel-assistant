@@ -39,8 +39,8 @@ def parse_args() -> argparse.Namespace:
         help="Extra profile fragment to append on top of the stack. Repeatable.",
     )
     parser.add_argument("--analysis-mode", choices=["quick", "full"], default="quick")
-    parser.add_argument("--provider", choices=["auto", "openai", "mock"], default="auto")
-    parser.add_argument("--model", default="gpt-5.2", help="Model name for the OpenAI Responses API.")
+    parser.add_argument("--provider", choices=["auto", "codex", "openai", "mock"], default="auto")
+    parser.add_argument("--model", default="gpt-5.4", help="Model name for Codex/OpenAI analyzer execution.")
     parser.add_argument(
         "--enable-web-search",
         action="store_true",

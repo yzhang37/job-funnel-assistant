@@ -120,6 +120,7 @@ Manual Intake 需要支持的 payload：
 - 交互即时
 - 支持任意混合输入
 - 后续还能直接回推摘要和分析结果
+- 当前 bot 应视为 owner-only 入口：只有配置好的 owner chat / owner user 发来的消息才会进入 manual intake
 - 当前第一版已验证：
   - `JD 文本`
   - `岗位链接 + JD 文本`
@@ -219,6 +220,7 @@ python3 scripts/process_telegram_manual_intake.py --provider auto
 - 支持 `JD 文本`
 - 支持 `岗位链接 + JD 文本`
 - 暂不支持 `纯岗位链接` 自动触发 live browser capture
+- 只处理配置好的 owner 消息：优先读取 `TELEGRAM_USER_ID`；如果没配，则退回到私聊场景下用 `TELEGRAM_CHAT_ID` 限制 chat；bot 自己的回复消息不会进入 intake
 
 TODO:
 
@@ -302,13 +304,15 @@ TODO:
 - Python 负责：输入处理、profile stack、prompt 组装、结果校验、报告渲染
 - LLM 负责：按照固定 analyzer spec 做深度判断
 - 本地 dry-run 可用 `mock provider`
-- 真正调用模型时，当前实现支持 OpenAI Responses API
+- 本地真实运行时，当前默认优先使用已登录的 `Codex` CLI
+- `OpenAI Responses API` 仍然保留，但只是可选 fallback，不是本地单机工作流的默认前提
 
 这样做的原因：
 
 - 这个任务的核心不是普通规则匹配，而是需要 LLM 做综合判断
 - 候选人画像需要独立插拔，不能绑死在单个 prompt 文本里
 - 后续接 Notion、通知、抓取脚本时，这个 analyzer 仍然可以保持单独部件
+- 对当前用户场景，更重要的是“本地电脑直接跑”，而不是额外引入一套单独 API 计费路径
 
 当前 browser capture 的第一阶段目标非常克制：
 
@@ -498,7 +502,16 @@ python3 scripts/run_job_funnel_analysis.py \
   --analysis-mode quick
 ```
 
-使用 OpenAI Responses API 真跑：
+默认用本机已登录的 Codex 真跑：
+
+```bash
+python3 scripts/run_job_funnel_analysis.py \
+  --jd-file examples/jd_example.md \
+  --provider auto \
+  --analysis-mode full
+```
+
+如果你明确想走 OpenAI API fallback：
 
 ```bash
 export OPENAI_API_KEY=...
@@ -511,6 +524,13 @@ python3 scripts/run_job_funnel_analysis.py \
   --markdown-output examples/reports/example_report.md \
   --json-output examples/reports/example_report.json
 ```
+
+provider 选择顺序：
+
+- `auto`：优先 `codex`，其次 `openai`，最后 `mock`
+- `codex`：强制使用本机已登录的 Codex CLI
+- `openai`：强制使用 `OPENAI_API_KEY`
+- `mock`：只做本地假数据 dry-run
 
 输入说明：
 

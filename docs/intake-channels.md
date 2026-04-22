@@ -111,6 +111,7 @@
 - 交互即时
 - 支持混合输入
 - 适合作为后续 notification / digest 的同一出口
+- 当前实现应收紧为 owner-only：只有配置好的 owner chat / owner user 发来的消息才进入 manual intake
 
 ### 2. Email Forward
 

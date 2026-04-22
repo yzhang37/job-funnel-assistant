@@ -4,6 +4,9 @@ import base64
 import json
 import mimetypes
 import os
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,6 +19,7 @@ RESPONSES_API_URL = "https://api.openai.com/v1/responses"
 
 @dataclass
 class ProviderRequest:
+    repo_root: Path
     developer_prompt: str
     user_text: str
     image_paths: list[Path]
@@ -79,6 +83,84 @@ class OpenAIResponsesProvider:
         for path in image_paths:
             content.append({"type": "input_image", "image_url": _image_to_data_url(path)})
         return content
+
+
+class CodexExecProvider:
+    def __init__(self, codex_bin: str | None = None) -> None:
+        self.codex_bin = codex_bin or shutil.which("codex")
+        if not self.codex_bin:
+            raise RuntimeError("codex CLI is not installed or not on PATH.")
+
+    def run(self, request: ProviderRequest) -> dict[str, Any]:
+        with tempfile.TemporaryDirectory(prefix="codex-provider-") as temp_dir:
+            temp_root = Path(temp_dir)
+            schema_path = temp_root / "output_schema.json"
+            schema_path.write_text(
+                json.dumps(request.schema["schema"], ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            output_path = temp_root / "last_message.json"
+            prompt_text = self._build_prompt(request)
+
+            command = [
+                self.codex_bin,
+                "exec",
+                "-C",
+                str(temp_root),
+                "--skip-git-repo-check",
+                "--sandbox",
+                "read-only",
+                "--ephemeral",
+                "--output-schema",
+                str(schema_path),
+                "-o",
+                str(output_path),
+                "-m",
+                request.model,
+            ]
+            if request.enable_web_search:
+                command.append("--search")
+            for image_path in request.image_paths:
+                command.extend(["-i", str(image_path)])
+            command.extend(["-",])
+
+            result = subprocess.run(
+                command,
+                input=prompt_text,
+                text=True,
+                capture_output=True,
+                timeout=900,
+                check=False,
+            )
+            if result.returncode != 0:
+                combined = "\n".join(
+                    part.strip()
+                    for part in (result.stdout, result.stderr)
+                    if part and part.strip()
+                )
+                raise RuntimeError(f"codex exec failed with code {result.returncode}: {combined}")
+            if not output_path.exists():
+                raise RuntimeError("codex exec finished without writing the last-message file.")
+            raw = output_path.read_text(encoding="utf-8").strip()
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Codex provider returned non-JSON output: {raw}") from exc
+
+    def _build_prompt(self, request: ProviderRequest) -> str:
+        return f"""你现在是这个本地工作流里的 Analyzer。
+
+## Developer Instructions
+{request.developer_prompt}
+
+## User Input
+{request.user_text}
+
+要求：
+- 严格遵守 developer instructions。
+- 最终只输出符合 JSON schema 的 JSON 对象。
+- 不要输出 markdown 代码块。
+""".strip()
 
 
 class MockProvider:
@@ -254,3 +336,17 @@ def _extract_field(text: str, field_name: str) -> str | None:
     tail = text.split(marker, 1)[1].split("\n", 1)[0].strip()
     return tail.strip('",')
 
+
+def codex_cli_is_ready(codex_bin: str | None = None) -> bool:
+    bin_path = codex_bin or shutil.which("codex")
+    if not bin_path:
+        return False
+    result = subprocess.run(
+        [bin_path, "login", "status"],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    combined = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    return result.returncode == 0 and "Logged in" in combined

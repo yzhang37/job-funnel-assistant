@@ -25,6 +25,14 @@ Current first runnable manual chain:
    - `Notion writer`
    - `Telegram short-result sender`
 
+Current analyzer execution preference:
+
+1. local `Codex` execution
+2. optional `OpenAI API` fallback
+3. `mock` dry-run fallback
+
+For the current single-machine local workflow, `Analyzer` should default to local `Codex`, not to `OPENAI_API_KEY`.
+
 ## Intake Layer
 
 The system should expose two top-level intake families:
@@ -139,6 +147,7 @@ Why:
 - simple bot-based delivery
 - easy to send concise summaries with links
 - low operational overhead for a personal workflow
+- can be constrained to an owner-only control surface so arbitrary incoming chats do not trigger the pipeline
 
 Fallbacks:
 
@@ -157,6 +166,17 @@ Current first runnable output path:
   - 风险
   - `JD` 链接
   - `Notion` 分析页链接
+
+## Telegram Intake Guard
+
+Current Telegram manual intake should only process owner-authored messages.
+
+Recommended policy:
+
+- require `TELEGRAM_CHAT_ID` to match the expected control chat
+- prefer `TELEGRAM_USER_ID` when available so only the owner's account is accepted
+- ignore `from.is_bot = true` messages
+- treat bot-authored replies as output only, not as intake input
 
 ## Secrets TODO
 

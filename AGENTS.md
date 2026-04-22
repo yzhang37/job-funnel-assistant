@@ -63,6 +63,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
   - write/update the Notion analysis page
   - send the Telegram short reply
   - attach the Notion page link in the Telegram response
+- Telegram manual intake should behave like an owner-only control surface. Only messages from the configured owner chat/user should be processed; bot-authored replies and messages from other chats/users must be ignored.
 - `Output` is not responsible for tracker dedupe, capture retries, or analyzer caching. Those belong to upstream execution layers.
 - For LinkedIn enrichment, prefer canonical company links already exposed on the page. Recommended resolution order: company URL from current page -> cached slug/url mapping -> direct `/company/<slug>/insights/` URL -> LinkedIn search fallback.
 - If the source site itself exposes company-level insights, capture those first, then enrich with LinkedIn when available, then official site / careers. Preserve source attribution instead of flattening everything into one unlabeled blob.
@@ -86,7 +87,7 @@ Common expected commands once implemented:
 - normalize raw tracker URLs to JD links: `python3 scripts/normalize_job_links.py --url <raw_search_or_view_url>`
 - prepare one browser discovery batch: `python3 scripts/prepare_tracker_discovery_batch.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3 --tracker-id <tracker_id> --raw-url <raw_url>`
 - analyze one job: `python3 scripts/analyze_job_fit.py --job <job.json> --profile <profile.json> --pretty`
-- run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <mock|openai>`
+- run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <auto|codex|openai|mock>`
 - render jd markdown: `python3 scripts/render_jd_markdown.py --input <capture.json> --output <jd.md>`
 - render company profile markdown: `python3 scripts/render_company_profile.py --input <profile.json> --output <company_profile.md>`
 - build job capture bundle: `python3 scripts/build_job_capture_bundle.py --job-input <job.json> --output-dir <bundle_dir>`
@@ -108,8 +109,10 @@ Common expected commands once implemented:
 - Treat resumes, credentials, and personal data as sensitive.
 - Prefer dry-run support for scraping, analysis, and notification steps.
 - TODO: 当前本地开发可使用 `.env.local` 一类本地 secrets 文件；未来如需长期运行或多机部署，应迁移到更安全的 secrets 管理方案，例如 AWS Secrets Manager。
+- 当前 analyzer 默认应优先使用本机已登录的 `Codex` CLI；`OPENAI_API_KEY` 路径只作为可选 fallback，不应作为本地单机工作流的默认前提。
 - 当前 Telegram manual intake 第一版已支持：`JD 文本` 与 `岗位链接 + JD 文本`。
 - 当前 Telegram manual intake 第一版仍未支持：`纯 job_url` 直接触发 live browser capture。
+- 当前 Telegram manual intake 第一版只处理配置好的 owner 消息：优先校验 `TELEGRAM_USER_ID`，若未配置则退回到私聊场景下的 `TELEGRAM_CHAT_ID`；bot 自己发出的消息不应进入 intake 流程。
 
 ## Definition Of Done
 

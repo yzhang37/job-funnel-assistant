@@ -8,7 +8,7 @@ from typing import Any
 
 from .job_packet import JobPacket, build_job_packet
 from .profile_loader import load_profile_stack
-from .providers import MockProvider, OpenAIResponsesProvider, ProviderRequest
+from .providers import CodexExecProvider, MockProvider, OpenAIResponsesProvider, ProviderRequest, codex_cli_is_ready
 from .renderer import render_markdown
 from .schema import REPORT_JSON_SCHEMA, validate_report_shape
 
@@ -26,7 +26,7 @@ def run_analysis(
     profile_stack_path: str | Path,
     extra_profile_fragments: list[str] | None = None,
     provider_name: str = "auto",
-    model: str = "gpt-5.2",
+    model: str = "gpt-5.4",
     analysis_mode: str = "quick",
     enable_web_search: bool = False,
     company_name: str | None = None,
@@ -54,6 +54,7 @@ def run_analysis(
     provider = _select_provider(provider_name)
     response = provider.run(
         ProviderRequest(
+            repo_root=repo_root,
             developer_prompt=developer_prompt,
             user_text=user_text,
             image_paths=packet.image_paths,
@@ -92,11 +93,15 @@ def save_outputs(result: RunResult, markdown_path: str | Path | None, json_path:
         output.write_text(json.dumps(result.payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _select_provider(provider_name: str) -> MockProvider | OpenAIResponsesProvider:
+def _select_provider(provider_name: str) -> MockProvider | OpenAIResponsesProvider | CodexExecProvider:
     if provider_name == "mock":
         return MockProvider()
+    if provider_name == "codex":
+        return CodexExecProvider()
     if provider_name == "openai":
         return OpenAIResponsesProvider()
+    if codex_cli_is_ready():
+        return CodexExecProvider()
     try:
         return OpenAIResponsesProvider()
     except RuntimeError:

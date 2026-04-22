@@ -17,7 +17,9 @@ from job_search_assistant.runtime import load_local_env
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Send one Telegram bot message using credentials from .env.local.")
-    parser.add_argument("--text", required=True, help="Text to send.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--text", help="Text to send.")
+    group.add_argument("--stdin", action="store_true", help="Read text to send from stdin.")
     parser.add_argument("--chat-id", help="Optional chat id override.")
     return parser.parse_args()
 
@@ -25,7 +27,12 @@ def parse_args() -> argparse.Namespace:
 def main(args: argparse.Namespace) -> None:
     load_local_env(ROOT)
     client = TelegramBotClient()
-    result = client.send_message(args.text, chat_id=args.chat_id)
+    text = args.text
+    if args.stdin:
+        text = sys.stdin.read()
+    if not text:
+        raise SystemExit("No message text provided.")
+    result = client.send_message(text, chat_id=args.chat_id)
     print(result["result"]["message_id"])
 
 

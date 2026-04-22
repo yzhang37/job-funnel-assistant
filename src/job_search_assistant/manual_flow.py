@@ -167,7 +167,7 @@ def run_analysis_for_capture_bundle(
     capture_bundle: CaptureBundleResult,
     profile_stack_path: str | Path,
     provider_name: str = "auto",
-    model: str = "gpt-5.2",
+    model: str = "gpt-5.4",
     analysis_mode: str = "full",
     enable_web_search: bool = False,
 ) -> RunResult:
