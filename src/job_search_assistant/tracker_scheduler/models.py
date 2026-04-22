@@ -25,6 +25,42 @@ class TrackerDefinition:
 
 
 @dataclass(frozen=True)
+class TrackerDiscoveryBatch:
+    tracker_id: str
+    source_platform: str
+    submitted_count: int
+    canonical_count: int
+    duplicate_input_count: int
+    canonical_job_urls: list[str] = field(default_factory=list)
+    new_job_urls: list[str] = field(default_factory=list)
+    existing_job_urls: list[str] = field(default_factory=list)
+    run_duplicate_job_urls: list[str] = field(default_factory=list)
+    total_new_job_urls: list[str] = field(default_factory=list)
+    remaining_target_new_jobs: int = 0
+    source_exhausted: bool = False
+    discovery_scope: str = "main_results"
+    ignored_sections: list[str] = field(default_factory=list)
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "tracker_id": self.tracker_id,
+            "source_platform": self.source_platform,
+            "submitted_count": self.submitted_count,
+            "canonical_count": self.canonical_count,
+            "duplicate_input_count": self.duplicate_input_count,
+            "canonical_job_urls": list(self.canonical_job_urls),
+            "new_job_urls": list(self.new_job_urls),
+            "existing_job_urls": list(self.existing_job_urls),
+            "run_duplicate_job_urls": list(self.run_duplicate_job_urls),
+            "total_new_job_urls": list(self.total_new_job_urls),
+            "remaining_target_new_jobs": self.remaining_target_new_jobs,
+            "source_exhausted": self.source_exhausted,
+            "discovery_scope": self.discovery_scope,
+            "ignored_sections": list(self.ignored_sections),
+        }
+
+
+@dataclass(frozen=True)
 class TrackerConfig:
     version: int
     trackers: list[TrackerDefinition] = field(default_factory=list)

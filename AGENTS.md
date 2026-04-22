@@ -37,8 +37,11 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Keep tracker configuration minimal and config-driven. Stable fields currently expected are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
 - `target_new_jobs` means "keep paging internally until this many previously unseen job links are found, or the source is exhausted." Pagination is an implementation detail, not a user-facing config field.
 - State storage for tracker scheduling should remain driver-abstracted. SQLite is the first implementation, but the service boundary should stay portable to MySQL/Aurora later.
+- Treat scheduler discovery as platform-adapter driven. LinkedIn and Indeed are the first supported search-result sources; future sites should plug in through the same canonical JD-link boundary.
 - For LinkedIn tracker discovery, treat the canonical output as JD links only. Current validated path is: click a result card -> read `currentJobId` from the search-results URL -> normalize to `https://www.linkedin.com/jobs/view/<job_id>/`.
+- For Indeed tracker discovery, treat the canonical output as JD links only. Current validated path is: click a result card -> read `vjk`/`jk` from the search/search-result URL -> normalize to `https://www.indeed.com/viewjob?jk=<id>`.
 - LinkedIn tracker discovery should not depend on reading the right-side JD body. Right-side content is for later capture, not for discovery.
+- Scheduler browser discovery should only consume the primary vertical result list. Ignore horizontal carousels, related-job rails, and detail-page recommendation modules in the first milestone.
 - For the first browser capture milestone, prefer a minimal output: convert extracted page content into `jd.md` before expanding to full packet/attachment workflows.
 - Company profile capture should remain source-agnostic. The stable output should be `company_profile.json` / `company_profile.md`, while source-specific behavior such as LinkedIn Premium Insights belongs in optional capture strategies rather than the core schema.
 - Public capture should converge on two entrypoints: `job link -> bundle` and `company name -> bundle`. Bundle output is the stable handoff format for analyzer, storage, and notification layers.
@@ -61,7 +64,8 @@ Common expected commands once implemented:
 
 - list due trackers: `python3 scripts/list_due_trackers.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3`
 - record tracker discovery: `python3 scripts/record_tracker_discovery.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3 --tracker-id <tracker_id> --job-url <job_url>`
-- normalize raw LinkedIn tracker URLs to JD links: `python3 scripts/normalize_linkedin_job_links.py --url <linkedin_search_or_view_url>`
+- normalize raw tracker URLs to JD links: `python3 scripts/normalize_job_links.py --url <raw_search_or_view_url>`
+- prepare one browser discovery batch: `python3 scripts/prepare_tracker_discovery_batch.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3 --tracker-id <tracker_id> --raw-url <raw_url>`
 - analyze one job: `python3 scripts/analyze_job_fit.py --job <job.json> --profile <profile.json> --pretty`
 - run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <mock|openai>`
 - render jd markdown: `python3 scripts/render_jd_markdown.py --input <capture.json> --output <jd.md>`

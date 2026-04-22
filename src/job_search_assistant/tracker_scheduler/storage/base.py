@@ -10,6 +10,9 @@ class TrackerStateStore(Protocol):
     def get_latest_run_states(self) -> dict[str, TrackerRunState]:
         """Return the latest known run state for each tracker id."""
 
+    def get_existing_job_urls(self, job_urls: list[str]) -> set[str]:
+        """Return the subset of job URLs that have already been discovered globally."""
+
     def record_discovery_run(
         self,
         *,

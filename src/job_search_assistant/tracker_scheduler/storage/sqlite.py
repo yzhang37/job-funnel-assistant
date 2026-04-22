@@ -54,6 +54,20 @@ class SQLiteTrackerStateStore:
             )
         return states
 
+    def get_existing_job_urls(self, job_urls: list[str]) -> set[str]:
+        normalized_urls = _normalize_urls(job_urls)
+        if not normalized_urls:
+            return set()
+
+        placeholders = ", ".join("?" for _ in normalized_urls)
+        query = (
+            "SELECT job_url FROM discovered_jobs "
+            f"WHERE job_url IN ({placeholders})"
+        )
+        with self._connect() as conn:
+            rows = conn.execute(query, tuple(normalized_urls)).fetchall()
+        return {str(row["job_url"]) for row in rows}
+
     def record_discovery_run(
         self,
         *,

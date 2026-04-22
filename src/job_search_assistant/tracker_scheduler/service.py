@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from .browser import BrowserDiscoverySession
 from .frequency import resolve_frequency_interval
 from .models import DueTracker, TrackerConfig, TrackerDiscoverySummary, TrackerRunState
 from .storage.base import TrackerStateStore
@@ -50,6 +51,10 @@ class TrackerScheduler:
             started_at=run_started_at,
             finished_at=run_finished_at,
         )
+
+    def start_browser_discovery_session(self, tracker_id: str) -> BrowserDiscoverySession:
+        tracker = self.config.get_tracker(tracker_id)
+        return BrowserDiscoverySession(tracker=tracker, store=self.store)
 
 
 def _resolve_due_reason(

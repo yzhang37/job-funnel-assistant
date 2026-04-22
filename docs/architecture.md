@@ -18,8 +18,11 @@
 - Tracker config should stay minimal and user-owned. Current stable fields are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
 - `target_new_jobs` means "discover this many new job links for the current run, or stop early if the source is exhausted." Internal paging should stay inside the capture/scheduler runtime, not inside user config.
 - Tracker scheduling state should remain portable across storage backends. SQLite is the first driver, but the service boundary should remain compatible with future MySQL/Aurora adapters.
+- Current scheduler discovery should be adapter-driven rather than LinkedIn-only. LinkedIn and Indeed are the first validated search-result sources.
 - Current LinkedIn tracker experiment validated a lightweight discovery path: click a left-side result card, read `currentJobId` from the search-results URL, normalize it to `https://www.linkedin.com/jobs/view/<job_id>/`, and page forward only when more new links are needed.
-- LinkedIn discovery should stop at canonical JD links. Reading the right-side JD body is part of later capture, not scheduler responsibility.
+- Current Indeed search-results experiment validated the sibling path: click a main result card, read `vjk` / `jk` from the URL, normalize it to `https://www.indeed.com/viewjob?jk=<id>`, and continue via normal result pagination when more new links are needed.
+- Discovery should stop at canonical JD links. Reading the right-side JD body or detail-page正文 is part of later capture, not scheduler responsibility.
+- First-milestone browser discovery should only consume the primary vertical results list. Ignore horizontal carousels, related-job rails, and detail-page recommendation modules until the primary discovery loop is stable.
 - Prefer APIs when available
 - Use scripted browser automation where feasible
 - Use `Computer Use` for brittle, high-friction manual-style flows

@@ -17,6 +17,8 @@ if str(SRC) not in sys.path:
 from job_search_assistant.tracker_scheduler import (  # noqa: E402
     SQLiteTrackerStateStore,
     TrackerScheduler,
+    canonicalize_job_urls,
+    infer_job_platform,
     load_tracker_config,
 )
 
@@ -34,8 +36,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tracker-id", required=True, help="Tracker id from trackers.toml.")
     parser.add_argument("--job-url", action="append", default=[], help="Discovered job URL. Repeat as needed.")
     parser.add_argument(
+        "--raw-url",
+        action="append",
+        default=[],
+        help="Raw browser-observed job URL. Repeat as needed; it will be canonicalized based on tracker platform.",
+    )
+    parser.add_argument(
         "--job-urls-file",
         help="Optional path to a newline-delimited text file or JSON list of job URLs.",
+    )
+    parser.add_argument(
+        "--raw-urls-file",
+        help="Optional path to a newline-delimited text file or JSON list of raw browser-observed job URLs.",
     )
     parser.add_argument(
         "--status",
@@ -53,10 +65,21 @@ def main() -> None:
     config = load_tracker_config(args.config)
     store = SQLiteTrackerStateStore(args.db)
     scheduler = TrackerScheduler(config, store)
+    tracker = config.get_tracker(args.tracker_id)
 
     job_urls = list(args.job_url)
     if args.job_urls_file:
         job_urls.extend(load_job_urls(args.job_urls_file))
+    raw_urls = list(args.raw_url)
+    if args.raw_urls_file:
+        raw_urls.extend(load_job_urls(args.raw_urls_file))
+    if raw_urls:
+        job_urls.extend(
+            canonicalize_job_urls(
+                raw_urls,
+                platform=infer_job_platform(tracker.url),
+            )
+        )
 
     started_at = parse_utc_timestamp(args.started_at) if args.started_at else None
     finished_at = parse_utc_timestamp(args.finished_at) if args.finished_at else None

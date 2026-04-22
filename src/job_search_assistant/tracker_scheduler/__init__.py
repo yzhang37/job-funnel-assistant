@@ -1,6 +1,13 @@
 """Tracker-driven job discovery scheduler."""
 
+from .browser import BrowserDiscoverySession
 from .config import load_tracker_config
+from .indeed import (
+    build_indeed_job_url,
+    canonicalize_indeed_job_url,
+    canonicalize_indeed_job_urls,
+    extract_indeed_job_id,
+)
 from .linkedin import (
     build_linkedin_job_url,
     canonicalize_linkedin_job_url,
@@ -10,22 +17,41 @@ from .linkedin import (
 from .models import (
     DueTracker,
     TrackerConfig,
+    TrackerDiscoveryBatch,
     TrackerDefinition,
     TrackerDiscoverySummary,
     TrackerRunState,
+)
+from .platforms import (
+    SUPPORTED_JOB_PLATFORMS,
+    canonicalize_job_url,
+    canonicalize_job_urls,
+    extract_job_id,
+    infer_job_platform,
 )
 from .service import TrackerScheduler
 from .storage.base import TrackerStateStore
 from .storage.sqlite import SQLiteTrackerStateStore
 
 __all__ = [
+    "BrowserDiscoverySession",
+    "build_indeed_job_url",
     "build_linkedin_job_url",
+    "canonicalize_indeed_job_url",
+    "canonicalize_indeed_job_urls",
+    "canonicalize_job_url",
+    "canonicalize_job_urls",
     "canonicalize_linkedin_job_url",
     "canonicalize_linkedin_job_urls",
     "DueTracker",
+    "extract_indeed_job_id",
+    "extract_job_id",
     "extract_linkedin_job_id",
+    "infer_job_platform",
     "SQLiteTrackerStateStore",
+    "SUPPORTED_JOB_PLATFORMS",
     "TrackerConfig",
+    "TrackerDiscoveryBatch",
     "TrackerDefinition",
     "TrackerDiscoverySummary",
     "TrackerRunState",

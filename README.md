@@ -99,7 +99,8 @@
 │   ├── build_company_profile_bundle.py
 │   ├── build_job_capture_bundle.py
 │   ├── list_due_trackers.py
-│   ├── normalize_linkedin_job_links.py
+│   ├── normalize_job_links.py
+│   ├── prepare_tracker_discovery_batch.py
 │   ├── record_tracker_discovery.py
 │   ├── render_company_profile.py
 │   ├── render_jd_markdown.py
@@ -228,7 +229,7 @@
 
 这层只解决一件事：
 
-- 定期访问你配置好的 LinkedIn trackers
+- 定期访问你配置好的 tracker / search results URL
 - 把当前结果里之前没见过的 job links 发现出来
 
 它不负责：
@@ -239,15 +240,15 @@
 
 这些都属于后面的 capture / analyzer。
 
-当前这层已经做过一次真实的 LinkedIn tracker 实验，验证到的规则是：
+当前这层已经做过真实的 LinkedIn / Indeed discovery 实验，验证到的规则是：
 
 1. discovery 这一步只需要 JD link，不需要先抓 JD 正文或公司画像
-2. 最稳的链接提取方式不是读右侧正文，而是：
-   - 点击左侧岗位卡片
-   - 从当前搜索结果页 URL 里读 `currentJobId`
-   - 规范化成 `https://www.linkedin.com/jobs/view/<job_id>/`
-3. 如果第一页不够，就继续翻页；翻页属于调度器内部行为，不应该暴露成用户配置
-4. 这一步到“拿到 canonical JD link”就结束，后面再交给 Capture Program
+2. 最稳的链接提取方式不是读详情正文，而是：
+   - LinkedIn：点击左侧岗位卡片，从搜索结果页 URL 里读 `currentJobId`，再规范化成 `https://www.linkedin.com/jobs/view/<job_id>/`
+   - Indeed：点击主结果卡片，从 URL 里读 `vjk` / `jk`，再规范化成 `https://www.indeed.com/viewjob?jk=<id>`
+3. 如果当前页新的链接不够，就继续翻页；翻页属于调度器内部行为，不应该暴露成用户配置
+4. 第一版 discovery 默认只消费主结果列表，不抓横向 carousel、相关推荐 rail、详情页推荐模块
+5. 这一步到“拿到 canonical JD link”就结束，后面再交给 Capture Program
 
 ## 模板文件
 
@@ -271,7 +272,8 @@
 - `scripts/build_job_capture_bundle.py`: 生成标准化 job bundle
 - `scripts/build_company_profile_bundle.py`: 生成标准化 company profile bundle
 - `scripts/list_due_trackers.py`: 列出当前应该运行的 trackers
-- `scripts/normalize_linkedin_job_links.py`: 把浏览器里拿到的 LinkedIn `search-results` / `view` URL 规范化成稳定 JD link
+- `scripts/normalize_job_links.py`: 把浏览器里拿到的 LinkedIn / Indeed 原始 URL 规范化成稳定 JD link
+- `scripts/prepare_tracker_discovery_batch.py`: 把浏览器会话里观察到的一批原始 URL 转成“哪些是新的 JD link”
 - `scripts/record_tracker_discovery.py`: 记录一次 tracker 运行发现了哪些 job links
 - `examples/jd_example.md`: 示例 JD
 - `examples/company_profile_example.json`: 示例公司画像输入
@@ -435,26 +437,47 @@ python3 scripts/record_tracker_discovery.py \
 - 这层只做 discovery，不做 analysis
 - 真正的翻页、抓够 `target_new_jobs` 条新链接，属于后续浏览器执行层
 
-9. 把原始 LinkedIn 搜索页 URL 规范化成 JD link：
+9. 把原始 LinkedIn / Indeed URL 规范化成 JD link：
 
 ```bash
-python3 scripts/normalize_linkedin_job_links.py \
+python3 scripts/normalize_job_links.py \
   --url "https://www.linkedin.com/jobs/search-results/?currentJobId=4391165384&keywords=Mid+level+software+engineer" \
-  --url "https://www.linkedin.com/jobs/view/4391193012/?alternateChannel=search"
+  --url "https://www.linkedin.com/jobs/view/4391193012/?alternateChannel=search" \
+  --url "https://www.indeed.com/jobs?q=software+engineer&l=Bellevue%2C+WA&vjk=f07957d490af8c1d"
 ```
 
 这条命令当前的定位：
 
-- 接收浏览器里实际拿到的 LinkedIn URL
-- 支持 `search-results?...currentJobId=<id>` 和 `/jobs/view/<id>/...`
+- 接收浏览器里实际拿到的 LinkedIn / Indeed URL
+- 支持 LinkedIn `search-results?...currentJobId=<id>` 和 `/jobs/view/<id>/...`
+- 支持 Indeed `search` / `viewjob` URL 里的 `jk` / `vjk`
 - 输出统一的 canonical JD link
 - 方便后续浏览器执行层只做点击和分页，不需要自己拼很多 URL 逻辑
+
+10. 准备一次浏览器 discovery batch：
+
+```bash
+python3 scripts/prepare_tracker_discovery_batch.py \
+  --config config/trackers.toml \
+  --db data/cache/tracker_scheduler.sqlite3 \
+  --tracker-id mid_level_software_engineer_linkedin \
+  --raw-url "https://www.linkedin.com/jobs/search-results/?currentJobId=4391165384&keywords=Mid+level+software+engineer" \
+  --raw-url "https://www.linkedin.com/jobs/view/4391193012/?alternateChannel=search"
+```
+
+这条命令当前的定位：
+
+- 接收浏览器会话里观察到的一批原始 URL
+- 规范化成 canonical JD link
+- 标记哪些链接是本轮新发现的
+- 输出一个 discovery batch，供后续真正的浏览器执行层或调度层消费
 
 注意：
 
 - 当前 Python 代码还没有直接驱动 `Computer Use`
 - 真正的 `URL -> 打开浏览器 -> 点开 Premium Insights -> 抓取内容` 仍属于下一阶段浏览器驱动层
 - 当前代码层已经先把“统一 schema / markdown 产物 / cache 落点”准备好了
+- 当前 tracker discovery 只关注主结果列表，不处理横向 carousel、相关推荐或详情页推荐模块
 
 未来如果这层接上浏览器驱动，推荐的 enrichment 入口顺序也已经定下来了：
 
@@ -529,7 +552,7 @@ python3 scripts/normalize_linkedin_job_links.py \
 
 1. 读取 `config/trackers.toml`
 2. 按 `source_frequency` 判断哪些 trackers 到期
-3. 访问 tracker 对应的 LinkedIn search results
+3. 访问 tracker 对应的 search results
 4. 发现新的 job links
 5. 把这些链接交给后续 capture
 
@@ -545,8 +568,11 @@ python3 scripts/normalize_linkedin_job_links.py \
 其中：
 
 - `target_new_jobs = 30` 的意思不是“抓前 30 条”
-- 而是“本次尽量抓到 30 条之前没见过的新链接；如果 LinkedIn 到底了，就提前停止”
-- 当前真实页面实验还确认了：对 LinkedIn search results，最稳的发现流程是“点左侧结果卡片 -> 读 `currentJobId` -> 规范化成 JD link -> 必要时切到 `Page 2`”
+- 而是“本次尽量抓到 30 条之前没见过的新链接；如果结果到底了，就提前停止”
+- 当前真实页面实验还确认了：
+  - LinkedIn：点左侧结果卡片 -> 读 `currentJobId` -> 规范化成 JD link -> 必要时切到 `Page 2`
+  - Indeed：点主结果卡片 -> 读 `vjk` / `jk` -> 规范化成 JD link -> 需要时继续翻页
+- 第一版只抓主结果列表，不抓横向 carousel、相关推荐 rail、详情页推荐模块
 
 数据库层也没有写死 SQLite 作为唯一选择。现在的实现是：
 
@@ -558,8 +584,8 @@ python3 scripts/normalize_linkedin_job_links.py \
 
 当前最重要的不是先写很多代码，而是先把以下三件事落地：
 
-1. 用真实 JD 跑一轮新版 analyzer
-2. 把 visa / sponsorship / 最新简历变化拆成独立 profile fragment
+1. 把 tracker browser execution 真正接到 discovery 层，稳定拿到新的 JD links
+2. 用真实 JD 跑一轮新版 analyzer
 3. 决定后续要不要把输出自动写入 Notion / 通知
 
 这些确定后，这个部件就可以作为整个找工作工作台的核心判断引擎。
