@@ -16,6 +16,11 @@
 
 这些都属于后面的 capture / analyzer。
 
+当前执行前提：
+
+- 这层在真实运行时需要 `Computer Use`
+- 因为它要自动打开浏览器、进入搜索结果页、点击主结果卡片、翻页，并最终拿到足够多的新 canonical JD links
+
 ## Pipeline Boundary
 
 推荐顺序：

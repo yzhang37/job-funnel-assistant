@@ -2,19 +2,73 @@
 
 ## Proposed Pipeline
 
-1. Tracker monitor / scheduler
-2. Browser capture / page traversal
-3. Job normalizer
-4. Company profile normalizer
-5. Bundle writer / manifest builder
-6. Fit analyzer
-7. Notion writer
-8. Notification sender
+1. Scheduled tracker intake
+2. Manual intake
+3. Capture (outputs bundle)
+4. Fit analyzer
+5. Notion writer
+6. Notification sender
+
+## Intake Layer
+
+The system should expose two top-level intake families:
+
+1. `Scheduled tracker intake`
+2. `Manual intake`
+
+### Scheduled tracker intake
+
+- background-only
+- driven by configured tracker URLs
+- outputs only new canonical JD links
+- no fit analysis
+- no company-value judgment
+- requires `Computer Use` in the current design
+
+### Manual intake
+
+- user-driven
+- mobile-first
+- should accept arbitrary incoming job material
+
+Preferred payloads:
+
+- `job_url`
+- `jd_text`
+- attachments
+- `company_name`
+- notes
+
+Preferred channel priority:
+
+1. Telegram
+2. Email forward
+3. Share sheet / shortcuts
+4. Lightweight web intake page
+
+All manual channels should map into the same internal request shape. Channel differences should not fork the downstream capture/analyzer logic.
+
+## Node Boundary
+
+The system-level node model should stay explicit:
+
+- `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`
+
+Interpretation:
+
+- `Tracker` discovers links
+- `Manual Intake` accepts arbitrary incoming job material
+- `Capture` is one node: it fetches, normalizes, and emits the bundle
+- `Analyzer` is one node: it consumes evidence and decides fit
 
 ## Collector Strategy
 
 - Treat configured job trackers as the first discovery layer. The scheduler should periodically revisit tracker URLs and discover previously unseen job links.
 - Scheduler scope is intentionally narrow: discover new job links, persist run state, and hand links off to capture. Do not do fit analysis or ranking in this stage.
+- Scheduled tracker execution currently requires `Computer Use`: open search-result pages, click cards, and paginate until enough new canonical JD links are collected.
+- Capture should remain the first layer that turns discovered input into durable evidence (`jd.md`, `job_posting.json`, `company_profile.json`, `manifest.json`).
+- Capture execution also currently requires `Computer Use`: open job pages, expand content, traverse company/insights pages, and gather JD/company evidence before writing the bundle.
+- Analyzer should remain the only layer that decides fit / priority (`主攻 / 备胎 / 放弃`).
 - Tracker config should stay minimal and user-owned. Current stable fields are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
 - `target_new_jobs` means "discover this many new job links for the current run, or stop early if the source is exhausted." Internal paging should stay inside the capture/scheduler runtime, not inside user config.
 - Tracker scheduling state should remain portable across storage backends. SQLite is the first driver, but the service boundary should remain compatible with future MySQL/Aurora adapters.
@@ -46,6 +100,8 @@ Why:
 Fallbacks:
 
 - email
+- share sheet / shortcut handoff
+- lightweight web intake page
 - local summary dashboard
 - thread automation follow-up inside Codex
 

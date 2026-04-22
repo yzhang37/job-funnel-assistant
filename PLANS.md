@@ -7,6 +7,11 @@
 - [ ] Import user's resume template
 - [ ] Confirm first target job sources
 - [ ] Confirm preferred notification channel
+- [x] Clarify intake model: scheduled tracker intake + manual intake
+- [x] Clarify manual intake payloads: `job_url`, `jd_text`, attachments, company name, notes
+- [x] Clarify manual intake channel priority: Telegram first, email forward second, share sheet/web intake later
+- [x] Clarify system node model: `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`
+- [x] Clarify execution assumption: both `Tracker` and `Capture` require `Computer Use` in the current design
 - [x] Create first standalone job-fit analyzer component
 - [x] Build LLM-driven Job Funnel / Resume Fit Analyst runner
 - [x] Add config-driven cache policy layer for company/job snapshots
@@ -49,6 +54,10 @@
 - [ ] Add retry and failure logging
 - [ ] Add manual review checkpoints
 - [ ] Add source-specific collectors
+- [ ] Add Telegram manual intake entry
+- [ ] Add email-forward intake entry
+- [ ] Add share-sheet / shortcut intake bridge
+- [ ] Add lightweight web intake page
 
 ## Notes
 
@@ -115,3 +124,25 @@ Current tracker scheduler progress:
 - real-page experiment on `mid_level_software_engineer_linkedin` confirmed that discovery can stay lightweight: click left result cards, read `currentJobId`, normalize to JD links, and page forward when the first page is exhausted
 - real-page experiment on Indeed search results confirmed that discovery can stay lightweight there too: click main result cards, read `vjk`/`jk`, normalize to canonical Indeed JD links, and continue via result pagination
 - first-milestone browser discovery now explicitly ignores horizontal carousels, related-job rails, and detail-page recommendation modules; only the primary vertical results list matters
+
+Current intake-layer progress:
+
+- product shape is now explicitly split into two entry families:
+  - scheduled tracker intake
+  - manual intake
+- manual intake is now defined as one logical entry that can accept:
+  - `job_url`
+  - `jd_text`
+  - attachments
+  - `company_name`
+  - notes
+- channel priority is now explicit:
+  - Telegram as the primary manual/mobile entry
+  - email forward as the secondary intake path
+  - share sheet / shortcuts and a lightweight web form as later enhancements
+- source channels should converge into one internal request shape rather than fork the downstream capture/analyzer pipeline
+- node boundary is now explicit:
+  - `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`
+- current execution assumption is also explicit:
+  - `Tracker` requires `Computer Use`
+  - `Capture` requires `Computer Use`

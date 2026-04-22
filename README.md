@@ -23,11 +23,12 @@
 
 1. Tracker Scheduler 定期访问你配置好的 job trackers
 2. 只发现新的 job links
-3. Capture Program 抓 JD 和公司画像，产出 bundle
-4. Analyzer 按你的模板分析匹配度
-5. 写入 Notion 数据库
-6. 发送消息提醒
-7. 你确认后再决定是否投递
+3. Manual Intake 也可以直接把 `job link` / `JD 文本` / 附件送进 Capture Program
+4. Capture Program 抓 JD 和公司画像，并输出 bundle
+5. Analyzer 按你的模板分析匹配度
+6. 写入 Notion 数据库
+7. 发送消息提醒
+8. 你确认后再决定是否投递
 
 ## 为什么这样设计
 
@@ -37,6 +38,123 @@
 - 有些网站需要网页自动化，不能只靠 API
 - 你已经有现成分析模板和简历模板，适合复用
 - 你希望先稳定发现新岗位，再交给后面的抓取和分析，而不是让调度层直接替你做判断
+- 你不一定总在电脑前，所以手动入口必须支持手机优先、任意格式、低摩擦输入
+
+## 入口设计
+
+当前全局上收敛成两类入口：
+
+### 1. Scheduled Tracker Intake
+
+这是后台入口，职责是：
+
+- 定期访问你配置好的 trackers
+- 只发现新的 canonical JD links
+- 不做 JD 抓取
+- 不做公司画像
+- 不做分析
+
+当前设计前提：
+
+- 这层真正运行时需要 `Computer Use`
+- 因为要自动打开浏览器、进入搜索结果页、点主结果卡片、翻页，直到拿到足够多的新 JD links
+
+这层的输出是：
+
+- `new job links`
+
+然后再交给 Capture Program。
+
+### 2. Manual Intake
+
+这是你主动喂数据的入口，职责是：
+
+- 接受你随手发来的岗位信息
+- 统一转换成后续 capture 可消费的请求
+
+Manual Intake 需要支持的 payload：
+
+- `job_url`
+- `jd_text`
+- `attachments`
+- `company_name`
+- `notes`
+
+这层不应该因为入口不同而分叉后续流程。无论来自 Telegram、邮件还是 web form，后面都应该走同一个 capture / analyzer 链路。
+
+## 全局节点
+
+当前全局链路应该理解成：
+
+- `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`
+
+这里的关键点是：
+
+- `Tracker` 只发现新的 JD links
+- `Manual Intake` 只接收人工输入
+- `Capture` 同时负责抓取和输出 bundle，bundle 不是单独业务节点
+- `Analyzer` 才负责判断 `主攻 / 备胎 / 放弃`
+
+## Manual Intake 渠道优先级
+
+### 1. Telegram
+
+推荐作为主入口。
+
+适合：
+
+- 手机直接发 URL
+- 粘贴 JD 文本
+- 发截图 / PDF
+- 补一句你当前最关心的问题
+
+为什么优先：
+
+- 手机体验最好
+- 交互即时
+- 支持任意混合输入
+- 后续还能直接回推摘要和分析结果
+
+### 2. Email Forward
+
+推荐作为补充入口，而不是主入口。
+
+适合：
+
+- 直接转发 recruiter 邮件
+- 转发 job alert
+- 转发别的邮箱里突然收到的 JD
+
+为什么保留：
+
+- 有些内容本来就在邮件里
+- 直接转发比复制粘贴更省事
+
+### 3. Share Sheet / Shortcut
+
+推荐作为后续增强入口。
+
+适合：
+
+- 手机上看到一个职位网页，直接“分享到助手”
+- 比复制链接再发消息更少一步
+
+### 4. Lightweight Web Intake Page
+
+推荐作为通用兜底入口。
+
+适合：
+
+- 粘贴 URL
+- 粘贴 JD 文本
+- 上传截图 / PDF
+- 临时补 company name / notes
+
+它的价值在于：
+
+- 跨设备
+- 不依赖特定聊天工具
+- 可以承接任意来源
 
 ## 推荐集成
 
@@ -47,6 +165,16 @@
 - API 或 RSS，如果目标网站支持
 - 浏览器自动化，如果网站必须登录或强依赖前端交互
 - `Computer Use` 只用于不好脚本化、但确实值得自动化的页面流程
+
+当前这套系统在第一阶段要明确两点：
+
+- `Tracker` 真实执行依赖 `Computer Use`
+- `Capture` 真实执行也依赖 `Computer Use`
+
+原因：
+
+- Tracker 需要自动打开搜索结果页、点卡片、翻页、拿 canonical JD link
+- Capture 需要自动打开岗位页、展开内容、进入 company / insights 页面并收集证据
 
 ### 2. 岗位管理
 
@@ -75,6 +203,7 @@
 - Telegram Bot 最适合程序化发送摘要和链接
 - 成本低，接入简单，后续也容易扩展
 - 你可以在手机上快速浏览，再决定是否回到 Notion 处理
+- Email 更适合做 forward intake 和 fallback，不适合做主工作台
 
 ## 当前仓库结构
 
@@ -198,7 +327,7 @@
 - 还可能出现 `Affiliated pages` 这种对产品/品牌结构有帮助的块
 - 但不是每家公司都会暴露完全相同的 block，所以 openings、alumni、affiliated pages 都应该视为 optional sections
 
-现在总 pipeline 的公开输出也开始收口成两个接口：
+现在总 pipeline 对外已经开始收口成两个主要 capture 接口：
 
 1. `job link -> bundle`
    - 目标产物：
@@ -249,6 +378,12 @@
 3. 如果当前页新的链接不够，就继续翻页；翻页属于调度器内部行为，不应该暴露成用户配置
 4. 第一版 discovery 默认只消费主结果列表，不抓横向 carousel、相关推荐 rail、详情页推荐模块
 5. 这一步到“拿到 canonical JD link”就结束，后面再交给 Capture Program
+
+换句话说，现在系统的用户侧使用方式是：
+
+- 后台：`Scheduled Tracker Intake -> new job links`
+- 手动：`Manual Intake -> job_url / jd_text / attachments`
+- 中间统一走：`Capture (outputs bundle) -> Analyzer`
 
 ## 模板文件
 
@@ -479,6 +614,11 @@ python3 scripts/prepare_tracker_discovery_batch.py \
 - 当前代码层已经先把“统一 schema / markdown 产物 / cache 落点”准备好了
 - 当前 tracker discovery 只关注主结果列表，不处理横向 carousel、相关推荐或详情页推荐模块
 
+但从全局设计上，已经明确：
+
+- `Tracker` 真实执行需要 `Computer Use`
+- `Capture` 真实执行也需要 `Computer Use`
+
 未来如果这层接上浏览器驱动，推荐的 enrichment 入口顺序也已经定下来了：
 
 - `job page company link`
@@ -545,6 +685,7 @@ python3 scripts/prepare_tracker_discovery_batch.py \
 - [docs/linkedin-company-resolution.md](/Users/l/Projects/找工作/docs/linkedin-company-resolution.md)
 - [docs/capture-bundle-spec.md](/Users/l/Projects/找工作/docs/capture-bundle-spec.md)
 - [docs/tracker-scheduler.md](/Users/l/Projects/找工作/docs/tracker-scheduler.md)
+- [docs/intake-channels.md](/Users/l/Projects/找工作/docs/intake-channels.md)
 
 ## Tracker Scheduler
 
@@ -582,10 +723,11 @@ python3 scripts/prepare_tracker_discovery_batch.py \
 
 ## 下一步
 
-当前最重要的不是先写很多代码，而是先把以下三件事落地：
+当前最重要的不是先写很多代码，而是先把以下四件事落地：
 
 1. 把 tracker browser execution 真正接到 discovery 层，稳定拿到新的 JD links
-2. 用真实 JD 跑一轮新版 analyzer
-3. 决定后续要不要把输出自动写入 Notion / 通知
+2. 把 manual intake 的产品层定义固定下来：Telegram 主入口、Email Forward 补充入口、Share Sheet / Web Intake 作为后续增强
+3. 用真实 JD 跑一轮新版 analyzer
+4. 决定后续要不要把输出自动写入 Notion / 通知
 
 这些确定后，这个部件就可以作为整个找工作工作台的核心判断引擎。

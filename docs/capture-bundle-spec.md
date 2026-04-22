@@ -4,6 +4,12 @@
 
 把浏览器抓取、公司画像 enrichment、后续 analyzer / Telegram / Notion 之间的交接格式固定成统一 bundle。
 
+这里要明确：
+
+- `Capture` 是一个节点
+- `bundle` 是 `Capture` 的输出
+- 不是独立的业务节点
+
 这层解决的问题不是“怎么抓页面”，而是：
 
 - 抓完后如何稳定交给下游
@@ -12,7 +18,7 @@
 
 ## Public Interfaces
 
-当前总 pipeline 对外收敛成两个公开接口：
+当前总 pipeline 对外收敛成两个公开 capture 接口：
 
 1. `job link -> bundle`
    - 输入：一个 JD URL
@@ -136,6 +142,11 @@
 
 - 当前这层已经把输出 contract 固定好了
 - 浏览器驱动层后续只需要把抓到的数据喂给这套 bundle writer
+
+当前设计前提也已经明确：
+
+- `Capture` 真实执行需要 `Computer Use`
+- 因为它要打开 job page、展开正文、进入 company / insights 页面，并把这些证据收成同一个 bundle
 
 ## Why This Boundary
 

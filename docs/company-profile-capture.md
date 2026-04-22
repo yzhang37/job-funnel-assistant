@@ -19,6 +19,7 @@
 - 有原站洞察时先抓原站，再补 LinkedIn，再补官网/官方 careers，且要保留来源分层
 - 第一程序输出的 `company_profile` 应尽量保留证据，不要在 capture 阶段过早浓缩成几条摘要
 - URL 是入口，但真正的浏览器驱动可以来自 `Computer Use`、脚本化浏览器、或其他 agent
+- 在当前项目设计里，真实的 company profile capture 以 `Computer Use` 为前提执行层
 
 ## Capture Modes
 

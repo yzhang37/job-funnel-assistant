@@ -31,7 +31,11 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Prefer incremental delivery over large one-shot builds.
 - Keep the pipeline modular: tracker scheduler, capture, analyzer, storage, notifier.
 - Design around replaceable integrations. Notion and Telegram are preferred initial targets, but avoid coupling core logic to any one provider.
+- Distinguish clearly between background intake and manual intake. Background intake is tracker-driven and scheduled; manual intake is user-driven and should accept arbitrary job links, JD text, and attachments.
+- Treat Telegram as the preferred manual intake channel for mobile-first use. Email forward is a secondary/manual fallback rather than the primary interactive surface.
+- Additional manual intake surfaces such as share sheet shortcuts and a lightweight web form are valid complements when they reduce friction, but they should map into the same internal request shape.
 - When a website has no reliable API, browser automation is acceptable. Prefer robust selectors and explicit retry logic.
+- In the current planned system, both `Tracker` execution and `Capture` execution depend on `Computer Use`. Tracker needs it to open search-result pages, click result cards, and paginate; Capture needs it to open job/company pages, expand content, and collect JD/company evidence.
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
 - Treat job trackers as the first discovery layer. The scheduler should only discover new job links from configured tracker URLs; it must not perform fit analysis or ranking.
 - Keep tracker configuration minimal and config-driven. Stable fields currently expected are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
@@ -45,6 +49,8 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - For the first browser capture milestone, prefer a minimal output: convert extracted page content into `jd.md` before expanding to full packet/attachment workflows.
 - Company profile capture should remain source-agnostic. The stable output should be `company_profile.json` / `company_profile.md`, while source-specific behavior such as LinkedIn Premium Insights belongs in optional capture strategies rather than the core schema.
 - Public capture should converge on two entrypoints: `job link -> bundle` and `company name -> bundle`. Bundle output is the stable handoff format for analyzer, storage, and notification layers.
+- System-level node model should stay explicit: `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer`.
+- Manual intake should expose one user-facing entry that accepts multiple payload types: `job_url`, `jd_text`, optional `attachments`, optional `company_name`, and optional `notes`. Different channels should not fork the downstream pipeline.
 - For LinkedIn enrichment, prefer canonical company links already exposed on the page. Recommended resolution order: company URL from current page -> cached slug/url mapping -> direct `/company/<slug>/insights/` URL -> LinkedIn search fallback.
 - If the source site itself exposes company-level insights, capture those first, then enrich with LinkedIn when available, then official site / careers. Preserve source attribution instead of flattening everything into one unlabeled blob.
 - Do not over-prune company profile output before it reaches the analyzer. Prefer maximal evidence preservation: normalized summary fields plus rich tables, time series, related pages, source snapshots, available signals, missing signals, and raw sections whenever they exist.
@@ -102,6 +108,10 @@ Initial focus:
 1. establish the project structure
 2. ingest the user's existing analysis and resume templates
 3. define the Notion schema
-4. choose and wire a message notification channel
-5. build a tracker-first discovery loop: trackers -> new job links -> capture -> analyzer
-6. validate the first real LinkedIn tracker execution path: click result cards, derive canonical JD links, and keep analysis out of the scheduler
+4. define the intake layer clearly:
+   - scheduled tracker intake
+   - manual intake (`job_url`, `jd_text`, attachments, company name)
+   - preferred channels: Telegram first, email forward second, share sheet/web intake later
+5. choose and wire a message notification channel
+6. build a tracker-first discovery loop: trackers -> new job links -> capture -> analyzer
+7. validate the first real LinkedIn tracker execution path: click result cards, derive canonical JD links, and keep analysis out of the scheduler
