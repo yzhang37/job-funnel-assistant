@@ -65,6 +65,22 @@ def configure_logging(level: str | int | None = None, *, force: bool = False) ->
     root.addHandler(stdout_handler)
     root.addHandler(stderr_handler)
 
+    # Third-party client libraries tend to emit raw multiline logs that do not
+    # follow our structured logging contract. Keep runtime output focused on
+    # application events and surface library errors through our own exception
+    # handling/logging instead.
+    for noisy_logger_name in (
+        "kafka",
+        "kafka.consumer",
+        "kafka.conn",
+        "kafka.client",
+        "mysql",
+        "mysql.connector",
+    ):
+        noisy_logger = logging.getLogger(noisy_logger_name)
+        noisy_logger.setLevel(logging.CRITICAL + 1)
+        noisy_logger.propagate = False
+
 
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)

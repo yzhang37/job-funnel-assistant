@@ -5,12 +5,15 @@ __pycache__/
 
 .env
 .env.*
+NARR.update.md
 
 .pytest_cache/
 .mypy_cache/
 
 examples/reports/
 data/cache/
+data/runtime/
+data/runtime_artifacts/
 *.sqlite3
 data/raw/manual_intake/
 data/logs/

@@ -341,6 +341,7 @@ TODO:
 │   └── raw/
 ├── docs/
 ├── examples/
+├── infra/
 ├── profiles/
 ├── prompts/
 ├── scripts/
@@ -362,7 +363,8 @@ TODO:
 │   └── job_search_assistant/
 │       ├── integrations/
 │       ├── runtime/
-│       └── tracker_scheduler/
+│       ├── tracker_scheduler/
+│       └── workers/
 └── templates/
 ```
 
@@ -391,6 +393,129 @@ TODO:
 - 这层默认按跨平台设计，不先绑定 LinkedIn / Indeed / MeeBoss / YC / Glassdoor 的专属字段
 
 这样后续不管是 `Computer Use`、其他 agent，还是手工补充内容，都能先把最核心的 JD 文本层稳定落地。
+
+## 7 部件本地运行时（当前实验版）
+
+当前仓库已经开始按 **7 部件** 的本地运行时落地：
+
+- 5 个业务组件：
+  - `Tracker`
+  - `Manual Intake`
+  - `Capture`
+  - `Analyzer`
+  - `Output`
+- 2 个基础设施组件：
+  - `MySQL`
+  - `Kafka`
+
+当前实现还不是分布式集群版本，但已经具备这些运行时边界：
+
+- 业务组件之间通过 Kafka topic 解耦
+- 共享状态、lease、job metadata 放在 MySQL
+- `Tracker` / `Capture` 不直接依赖裸 `Computer Use`
+- 它们依赖的是本机 `Browser Execution Broker` 抽象
+- `Browser Execution Broker` 当前由 `Codex + Computer Use` 实现
+- 同一台机器上的浏览器自动化任务会进入同一个本地 browser lane，避免 `Tracker` / `Capture` 抢同一个桌面
+
+### 当前本地假设
+
+当前这版本地运行时是按下面的环境验证的：
+
+- macOS
+- 本机已登录 `Codex`
+- Chrome 已安装并有目标网站登录态
+- MySQL 使用本机可执行的 `mysqld`
+- Kafka 使用本机安装的 Kafka 二进制
+
+当前仓库里的默认本地配置在：
+
+- `config/runtime.toml`
+
+当前验证通过的默认端口：
+
+- MySQL: `127.0.0.1:3307`
+- Kafka: `127.0.0.1:9092`
+
+### 本地启动顺序
+
+先准备 Python 环境：
+
+```bash
+./scripts/bootstrap_runtime_env.sh
+```
+
+再启动本地 MySQL + Kafka：
+
+```bash
+./scripts/runtime_infra_up.sh
+```
+
+再初始化 schema / topic：
+
+```bash
+./.venv/bin/python scripts/init_runtime_infra.py
+```
+
+### 常驻服务命令
+
+当前每个业务组件都已经有独立 runner：
+
+```bash
+./.venv/bin/python scripts/run_manual_intake_service.py
+./.venv/bin/python scripts/run_capture_service.py
+./.venv/bin/python scripts/run_analyzer_service.py
+./.venv/bin/python scripts/run_output_service.py
+./.venv/bin/python scripts/run_tracker_service.py --config config/trackers.toml
+```
+
+如果只想跑一轮，而不是常驻：
+
+```bash
+./.venv/bin/python scripts/run_manual_intake_service.py --once
+./.venv/bin/python scripts/run_capture_service.py --once
+./.venv/bin/python scripts/run_analyzer_service.py --once
+./.venv/bin/python scripts/run_output_service.py --once
+./.venv/bin/python scripts/run_tracker_service.py --once --config config/trackers.toml
+```
+
+### 本地 smoke test
+
+可以直接发布一条 `capture.requested`，然后顺序跑 `Capture -> Analyzer -> Output`：
+
+```bash
+./.venv/bin/python scripts/runtime_smoke_test.py \
+  --job-url "https://www.indeed.com/viewjob?jk=f07957d490af8c1d" \
+  --reply-chat-id "<telegram_chat_id>"
+```
+
+也可以只发一条 capture 请求：
+
+```bash
+./.venv/bin/python scripts/enqueue_capture_request.py \
+  --job-url "https://www.indeed.com/viewjob?jk=f07957d490af8c1d"
+```
+
+### 停止本地基础设施
+
+```bash
+./scripts/runtime_infra_down.sh
+```
+
+### 目前已验证的内容
+
+当前这版已经做过真实验证：
+
+- 本地 MySQL / Kafka 启动与初始化
+- `Tracker -> Kafka -> capture.requested`
+- `capture.requested -> Capture -> analysis.requested`
+- `analysis.requested -> Analyzer -> output.requested`
+- `output.requested -> Output -> Notion / Telegram`
+
+当前仍然要记住的限制：
+
+- artifact store 目前仍是本地文件系统，不是远端对象存储
+- 当前更像“单节点可生产运行 + 未来可扩展”，还不是完整多机 HA 版本
+- `Browser Execution Broker` 目前是本机抽象层，不是独立 daemon
 
 公司画像这一层现在也单独建模了：
 

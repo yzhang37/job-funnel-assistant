@@ -1,0 +1,68 @@
+version = 1
+
+[mysql]
+host = "127.0.0.1"
+port = 3307
+database = "job_funnel_runtime"
+user = "jobsearch"
+password = "jobsearch"
+pool_size = 10
+connect_timeout_seconds = 10
+
+[kafka]
+bootstrap_servers = ["127.0.0.1:9092"]
+client_id = "job-funnel-runtime"
+request_timeout_ms = 30000
+
+[artifact_store]
+driver = "filesystem"
+root = "data/runtime_artifacts"
+
+[browser_broker]
+node_id = "local-mac"
+lane_name = "default"
+lock_dir = "data/runtime/browser_broker"
+acquire_timeout_seconds = 1800
+poll_interval_seconds = 2
+
+[topics]
+tracker_discovery_requested = "tracker.discovery.requested"
+tracker_links_discovered = "tracker.links.discovered"
+capture_requested = "capture.requested"
+capture_bundle_ready = "capture.bundle.ready"
+analysis_requested = "analysis.requested"
+analysis_ready = "analysis.ready"
+output_requested = "output.requested"
+
+[services.tracker]
+poll_interval_seconds = 30
+consumer_group = "job-funnel-tracker"
+model = "gpt-5.4"
+tracker_store_driver = "mysql"
+
+[services.manual_intake]
+poll_interval_seconds = 30
+consumer_group = "job-funnel-manual-intake"
+source_channel = "telegram"
+send_ack = true
+
+[services.capture]
+poll_interval_seconds = 5
+consumer_group = "job-funnel-capture"
+bundle_root = "data/runtime_artifacts/capture"
+model = "gpt-5.4"
+
+[services.analyzer]
+poll_interval_seconds = 5
+consumer_group = "job-funnel-analyzer"
+provider = "auto"
+model = "gpt-5.4"
+analysis_mode = "full"
+enable_web_search = false
+profile_stack = "profiles/default_stack.json"
+
+[services.output]
+poll_interval_seconds = 5
+consumer_group = "job-funnel-output"
+write_notion = true
+send_telegram = true

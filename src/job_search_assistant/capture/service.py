@@ -3,11 +3,15 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+from typing import TYPE_CHECKING
 
 from job_search_assistant.runtime import format_kv, get_logger
 
 from .company_profile import CompanyProfileContent
 from .live_capture import codex_live_capture_company_name
+
+if TYPE_CHECKING:
+    from job_search_assistant.runtime.browser_broker import BrowserExecutionBroker
 
 
 logger = get_logger("capture.service")
@@ -60,6 +64,7 @@ def enrich_company_profile_for_manual_capture(
     source_platform: str | None,
     source_label: str,
     model: str,
+    browser_broker: BrowserExecutionBroker | None = None,
 ) -> CompanyProfileContent | None:
     if not company_name:
         return None
@@ -74,12 +79,20 @@ def enrich_company_profile_for_manual_capture(
     )
 
     try:
-        payload = codex_live_capture_company_name(
-            company_name=company_name,
-            model=model,
-            job_url=job_url,
-            jd_text=jd_text,
-        )
+        if browser_broker is None:
+            payload = codex_live_capture_company_name(
+                company_name=company_name,
+                model=model,
+                job_url=job_url,
+                jd_text=jd_text,
+            )
+        else:
+            payload = browser_broker.capture_company_name(
+                company_name=company_name,
+                model=model,
+                job_url=job_url,
+                jd_text=jd_text,
+            )
     except RuntimeError as exc:
         logger.warning(
             format_kv(

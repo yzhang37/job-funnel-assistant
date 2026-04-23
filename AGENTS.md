@@ -36,6 +36,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
   - `Analyzer`
   - `Output`
 - Design around replaceable integrations. Notion and Telegram are preferred initial targets, but avoid coupling core logic to any one provider.
+- Runtime deployment may evolve into seven system parts: the five business components plus `MySQL` and `Kafka`. Keep the five business boundaries stable even when runtime infrastructure changes.
 - Distinguish clearly between background intake and manual intake. Background intake is tracker-driven and scheduled; manual intake is user-driven and should accept arbitrary job links, JD text, and attachments.
 - Treat Telegram as the preferred manual intake channel for mobile-first use. Email forward is a secondary/manual fallback rather than the primary interactive surface.
 - Additional manual intake surfaces such as share sheet shortcuts and a lightweight web form are valid complements when they reduce friction, but they should map into the same internal request shape.
@@ -101,6 +102,17 @@ Common expected commands once implemented:
 - process Telegram manual-intake updates: `python3 scripts/process_telegram_manual_intake.py --provider auto`
 - install Telegram manual-intake launch agent: `python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full`
 - send one Telegram message from `.env.local`: `python3 scripts/send_telegram_message.py --text "hello"`
+- bootstrap local runtime python env: `./scripts/bootstrap_runtime_env.sh`
+- start local runtime infra (MySQL + Kafka): `./scripts/runtime_infra_up.sh`
+- stop local runtime infra (MySQL + Kafka): `./scripts/runtime_infra_down.sh`
+- initialize local runtime schema and topics: `./.venv/bin/python scripts/init_runtime_infra.py`
+- enqueue one capture request into Kafka: `./.venv/bin/python scripts/enqueue_capture_request.py --job-url <job_url>`
+- run manual-intake worker once: `./.venv/bin/python scripts/run_manual_intake_service.py --once`
+- run capture worker once: `./.venv/bin/python scripts/run_capture_service.py --once`
+- run analyzer worker once: `./.venv/bin/python scripts/run_analyzer_service.py --once`
+- run output worker once: `./.venv/bin/python scripts/run_output_service.py --once`
+- run tracker worker once: `./.venv/bin/python scripts/run_tracker_service.py --once --config config/trackers.toml`
+- run one local queue-driven smoke test: `./.venv/bin/python scripts/runtime_smoke_test.py --job-url <job_url> --reply-chat-id <telegram_chat_id>`
 - validate cache layer: `python3 -m py_compile src/job_search_assistant/cache/*.py`
 - run app: `TBD`
 - run automation: `TBD`

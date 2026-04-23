@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from job_search_assistant.analyzer.job_packet import infer_company_name, infer_title
@@ -24,6 +25,9 @@ from job_search_assistant.capture import (
     render_jd_markdown,
 )
 from job_search_assistant.runtime import format_kv, get_logger
+
+if TYPE_CHECKING:
+    from job_search_assistant.runtime.browser_broker import BrowserExecutionBroker
 
 
 URL_PATTERN = re.compile(r"https?://\S+")
@@ -102,6 +106,7 @@ def build_manual_capture_bundle(
     request: ManualIntakeRequest,
     output_root: Path,
     model: str = "gpt-5.4",
+    browser_broker: BrowserExecutionBroker | None = None,
 ) -> CaptureBundleResult:
     started = time.monotonic()
     input_kind = "job_url" if request.job_url and not request.jd_text else "job_url_and_jd_text" if request.job_url and request.jd_text else "jd_text"
@@ -139,12 +144,16 @@ def build_manual_capture_bundle(
                 source_platform=source_platform,
                 source_label=request.source_channel,
                 model=model,
+                browser_broker=browser_broker,
             )
             if company_profile is not None:
                 company_profile_payload = asdict(company_profile)
                 company_profile_markdown = render_company_profile_markdown(company_profile)
     elif request.job_url:
-        captured = codex_live_capture_job_url(job_url=request.job_url, model=model)
+        if browser_broker is None:
+            captured = codex_live_capture_job_url(job_url=request.job_url, model=model)
+        else:
+            captured = browser_broker.capture_job_url(job_url=request.job_url, model=model)
         job_payload = dict(captured["job_posting"])
         if request.company_name and not job_payload.get("company"):
             job_payload["company"] = request.company_name
@@ -256,6 +265,29 @@ def run_analysis_for_capture_bundle(
         )
     )
     return result
+
+
+def load_capture_bundle_result(bundle_dir: Path) -> CaptureBundleResult:
+    bundle_dir = Path(bundle_dir)
+    manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+    job_posting_payload = json.loads((bundle_dir / "job_posting.json").read_text(encoding="utf-8"))
+    jd_markdown = (bundle_dir / "jd.md").read_text(encoding="utf-8")
+    company_profile_payload = None
+    company_profile_markdown = None
+    company_json_path = bundle_dir / "company_profile.json"
+    company_md_path = bundle_dir / "company_profile.md"
+    if company_json_path.exists():
+        company_profile_payload = json.loads(company_json_path.read_text(encoding="utf-8"))
+    if company_md_path.exists():
+        company_profile_markdown = company_md_path.read_text(encoding="utf-8")
+    return CaptureBundleResult(
+        bundle_dir=bundle_dir,
+        manifest=manifest,
+        jd_markdown=jd_markdown,
+        job_posting_payload=job_posting_payload,
+        company_profile_markdown=company_profile_markdown,
+        company_profile_payload=company_profile_payload,
+    )
 
 
 def build_telegram_short_message(
