@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .cache import write_company_profile_cache
 from .company_profile import CompanyProfileContent, render_company_profile_markdown
 from .jd_markdown import JobPostingContent, render_jd_markdown
 
@@ -46,6 +47,9 @@ def build_job_capture_bundle(
     attachments: list[str | Path | dict[str, Any]] | None = None,
     source_inputs: dict[str, Any] | None = None,
     notes: list[str] | None = None,
+    repo_root: str | Path | None = None,
+    cache_db: str | Path | None = None,
+    cache_config: str | Path | None = None,
 ) -> Path:
     bundle_dir = Path(output_dir)
     bundle_dir.mkdir(parents=True, exist_ok=True)
@@ -63,6 +67,7 @@ def build_job_capture_bundle(
 
     available_outputs = ["job_posting", "jd_markdown"]
     company_name = posting.company
+    cache_summary: dict[str, int] = {}
 
     if company_profile is not None:
         company_payload_path = bundle_dir / "company_profile.json"
@@ -74,6 +79,17 @@ def build_job_capture_bundle(
         artifacts.append(_artifact_entry("company_profile_markdown", "markdown", company_markdown_path, bundle_dir))
         available_outputs.extend(["company_profile", "company_profile_markdown"])
         company_name = company_name or company_profile.company_name
+        if repo_root is not None:
+            cache_summary = write_company_profile_cache(
+                company_profile,
+                repo_root=Path(repo_root).expanduser().resolve(),
+                cache_db=Path(cache_db).expanduser().resolve() if cache_db else None,
+                cache_config=Path(cache_config).expanduser().resolve() if cache_config else None,
+                metadata={
+                    "bundle_kind": "job_capture",
+                    "bundle_dir": str(bundle_dir),
+                },
+            )
 
     manifest = {
         "bundle_version": BUNDLE_VERSION,
@@ -93,6 +109,11 @@ def build_job_capture_bundle(
         "artifacts": artifacts,
         "attachments": copied_attachments,
         "available_outputs": available_outputs,
+        "cache": _compact_dict(
+            {
+                "company_profile": cache_summary or None,
+            }
+        ),
         "notes": [note for note in (notes or []) if note],
     }
     manifest_path = bundle_dir / "manifest.json"
@@ -107,12 +128,16 @@ def build_company_profile_bundle(
     attachments: list[str | Path | dict[str, Any]] | None = None,
     source_inputs: dict[str, Any] | None = None,
     notes: list[str] | None = None,
+    repo_root: str | Path | None = None,
+    cache_db: str | Path | None = None,
+    cache_config: str | Path | None = None,
 ) -> Path:
     bundle_dir = Path(output_dir)
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
     artifacts: list[dict[str, Any]] = []
     copied_attachments = _copy_attachments(bundle_dir, attachments or [])
+    cache_summary: dict[str, int] = {}
 
     company_payload_path = bundle_dir / "company_profile.json"
     _write_json(company_payload_path, asdict(company_profile))
@@ -121,6 +146,17 @@ def build_company_profile_bundle(
     company_markdown_path = bundle_dir / "company_profile.md"
     company_markdown_path.write_text(render_company_profile_markdown(company_profile), encoding="utf-8")
     artifacts.append(_artifact_entry("company_profile_markdown", "markdown", company_markdown_path, bundle_dir))
+    if repo_root is not None:
+        cache_summary = write_company_profile_cache(
+            company_profile,
+            repo_root=Path(repo_root).expanduser().resolve(),
+            cache_db=Path(cache_db).expanduser().resolve() if cache_db else None,
+            cache_config=Path(cache_config).expanduser().resolve() if cache_config else None,
+            metadata={
+                "bundle_kind": "company_profile_capture",
+                "bundle_dir": str(bundle_dir),
+            },
+        )
 
     manifest = {
         "bundle_version": BUNDLE_VERSION,
@@ -139,6 +175,11 @@ def build_company_profile_bundle(
         "artifacts": artifacts,
         "attachments": copied_attachments,
         "available_outputs": ["company_profile", "company_profile_markdown"],
+        "cache": _compact_dict(
+            {
+                "company_profile": cache_summary or None,
+            }
+        ),
         "notes": [note for note in (notes or []) if note],
     }
     manifest_path = bundle_dir / "manifest.json"

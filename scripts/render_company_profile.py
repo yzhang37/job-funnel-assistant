@@ -12,8 +12,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from job_search_assistant.cache import CachePolicyRegistry, CacheStore
-from job_search_assistant.capture import CompanyProfileContent, render_company_profile_markdown
+from job_search_assistant.capture import (
+    CompanyProfileContent,
+    render_company_profile_markdown,
+    write_company_profile_cache,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,34 +59,15 @@ def main() -> None:
     print(markdown)
 
     if args.cache_db:
-        cache_summary = write_cache(profile, cache_db=Path(args.cache_db), cache_config=Path(args.cache_config))
+        cache_summary = write_company_profile_cache(
+            profile,
+            repo_root=ROOT,
+            cache_db=Path(args.cache_db),
+            cache_config=Path(args.cache_config),
+        )
         if args.print_cache_summary:
             for namespace, field_count in cache_summary.items():
                 print(f"[cache] {namespace}: {field_count} fields")
-
-
-def write_cache(
-    profile: CompanyProfileContent,
-    *,
-    cache_db: Path,
-    cache_config: Path,
-) -> dict[str, int]:
-    policy_registry = CachePolicyRegistry.from_file(cache_config)
-    store = CacheStore(cache_db, policy_registry)
-    subject_key = profile.subject_key()
-    summary: dict[str, int] = {}
-
-    for namespace, fields in profile.split_cache_payloads().items():
-        store.upsert_snapshot(
-            namespace=namespace,
-            subject_key=subject_key,
-            fields=fields,
-            source_platform=profile.source_platform or "",
-            source_url=profile.source_url,
-            metadata={"capture_kind": "company_profile"},
-        )
-        summary[namespace] = len(fields)
-    return summary
 
 
 if __name__ == "__main__":

@@ -106,6 +106,7 @@ Interpretation:
 - Scheduler scope is intentionally narrow: discover new job links, persist run state, and hand links off to capture. Do not do fit analysis or ranking in this stage.
 - Scheduled tracker execution currently requires `Computer Use`: open search-result pages, click cards, and paginate until enough new canonical JD links are collected.
 - Capture should remain the first layer that turns discovered input into durable evidence (`jd.md`, `job_posting.json`, `company_profile.json`, `manifest.json`).
+- Company-profile enrichment, LinkedIn/official/source-native insights capture, and company-profile cache writes all belong to `Capture`.
 - Capture execution also currently requires `Computer Use`: open job pages, expand content, traverse company/insights pages, and gather JD/company evidence before writing the bundle.
 - Analyzer should remain the only layer that decides fit / priority (`主攻 / 备胎 / 放弃`).
 - Tracker config should stay minimal and user-owned. Current stable fields are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
@@ -124,6 +125,10 @@ Interpretation:
 - For LinkedIn enrichment, treat company URL resolution as a separate step: canonical company link first, cached slug/url second, direct insights URL third, search fallback last
 - Treat LinkedIn insights blocks as optional modules. In current real-page testing, `Total employee count` and `function distribution` are stable high-value blocks, while openings/alumni/affiliated-pages may appear inconsistently across companies
 - Company profile output should bias toward maximal evidence preservation rather than early summarization. Analyzer-facing handoff should retain summary metrics, tables, time series, related pages, available/missing signals, source snapshots, and raw captured blocks whenever possible.
+- Current implemented `Capture` paths are:
+  - `job_url only -> live browser capture -> bundle + company_profile cache`
+  - `jd_text -> inferred company name -> live company-profile enrichment -> bundle + company_profile cache`
+  - `company name -> bundle`
 
 ## Notification Strategy
 

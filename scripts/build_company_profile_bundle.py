@@ -25,6 +25,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--url", help="Optional source URL override.")
     parser.add_argument("--attachment", action="append", default=[], help="Optional attachment file path. Repeat as needed.")
     parser.add_argument("--note", action="append", default=[], help="Optional bundle note. Repeat as needed.")
+    parser.add_argument("--cache-db", help="Optional SQLite cache database override.")
+    parser.add_argument("--cache-config", help="Optional cache policy config override.")
     return parser.parse_args()
 
 
@@ -41,6 +43,9 @@ def main() -> None:
         output_dir=args.output_dir,
         company_profile=company_profile,
         attachments=args.attachment,
+        repo_root=ROOT,
+        cache_db=args.cache_db,
+        cache_config=args.cache_config,
         source_inputs={"requested_company_name": args.company_name} if args.company_name else None,
         notes=args.note,
     )

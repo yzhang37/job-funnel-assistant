@@ -445,6 +445,10 @@ TODO:
 - analyzer、Telegram、Notion、缓存都围绕同一个 handoff format
 - 以后接 Computer Use 或别的 agent，不需要再重新定义输出协议
 - 附件数量和文件名都可以保持松散，不需要写死
+- 当前 `Capture` 已经把 `Company Profile / Insights / Cache` 一起收口：
+  - `job_url only -> live browser capture -> bundle`
+  - `jd_text -> inferred company name -> live company-profile enrichment -> bundle`
+  - 同一次 `Capture` 运行会写入 `company_profile_static` / `company_insights` cache
 
 在这两个公开 capture 接口之前，现在多了一层调度入口：
 
@@ -500,6 +504,7 @@ TODO:
 - `scripts/render_company_profile.py`: 将公司画像 capture 渲染成 `company_profile.md`，并可选写入缓存
 - `scripts/build_job_capture_bundle.py`: 生成标准化 job bundle
 - `scripts/build_company_profile_bundle.py`: 生成标准化 company profile bundle
+- `scripts/capture_company_profile_from_name.py`: 用本机 `Codex` + `Computer Use` 从公司名 live 抓取 `company_profile bundle`
 - `scripts/run_manual_intake_once.py`: 运行一条 manual intake，并完成 Capture -> Analyzer -> Notion -> Telegram
 - `scripts/process_telegram_manual_intake.py`: 拉取 Telegram bot updates，并按 manual intake 流程处理
 - `scripts/send_telegram_message.py`: 从 `.env.local` 读取 bot 凭证，发送一条 Telegram 消息

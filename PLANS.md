@@ -49,10 +49,14 @@
 - [x] Add first bundle/manifest writer for normalized capture artifacts
 - [x] Define multi-source company enrichment rule: source-native insights -> LinkedIn insights -> official site / careers -> other public sources
 - [x] Upgrade `company_profile` output to preserve maximal evidence instead of only summary fields
+- [x] Implement `job_url only -> live browser capture -> bundle` in `Capture`
+- [x] Implement `jd_text -> inferred company profile enrichment -> bundle` in `Capture`
+- [x] Keep `Company Profile / Insights / Cache` ownership fully inside `Capture`
+- [x] Write `company_profile_static` / `company_insights` cache rows during production `Capture` runs
 - [x] Run template-based fit analysis for the first manual-intake chain
 - [x] Save analysis output to Notion for the first manual-intake chain
 - [x] Send Telegram short-result output for the first manual-intake chain
-- [ ] Validate with dry-run output
+- [x] Validate production-style end-to-end run: `job_url only -> Capture -> Analyzer -> Notion -> Telegram`
 
 ## Phase 3: Automation
 

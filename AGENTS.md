@@ -54,6 +54,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Scheduler browser discovery should only consume the primary vertical result list. Ignore horizontal carousels, related-job rails, and detail-page recommendation modules in the first milestone.
 - For the first browser capture milestone, prefer a minimal output: convert extracted page content into `jd.md` before expanding to full packet/attachment workflows.
 - Company profile capture should remain source-agnostic. The stable output should be `company_profile.json` / `company_profile.md`, while source-specific behavior such as LinkedIn Premium Insights belongs in optional capture strategies rather than the core schema.
+- All company-profile / insights / cache responsibilities must stay inside `Capture`. `Manual Intake` may normalize `job_url`, `jd_text`, `company_name`, and attachments, but it must not own company-profile fetch, enrichment, or cache writes.
 - Public capture should converge on two entrypoints: `job link -> bundle` and `company name -> bundle`. Bundle output is the stable handoff format for analyzer, storage, and notification layers.
 - System-level node model should stay explicit:
   - `Tracker / Manual Intake -> Capture -> Analyzer -> Output`
@@ -93,6 +94,7 @@ Common expected commands once implemented:
 - render company profile markdown: `python3 scripts/render_company_profile.py --input <profile.json> --output <company_profile.md>`
 - build job capture bundle: `python3 scripts/build_job_capture_bundle.py --job-input <job.json> --output-dir <bundle_dir>`
 - build company profile bundle: `python3 scripts/build_company_profile_bundle.py --input <company_profile.json> --output-dir <bundle_dir>`
+- capture company profile live from company name: `python3 scripts/capture_company_profile_from_name.py --company-name <company_name>`
 - run one manual intake end-to-end: `python3 scripts/run_manual_intake_once.py --text-file <input.txt> --source-channel telegram --provider auto --write-notion --send-telegram`
 - process Telegram manual-intake updates: `python3 scripts/process_telegram_manual_intake.py --provider auto`
 - install Telegram manual-intake launch agent: `python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full`
@@ -115,6 +117,7 @@ Common expected commands once implemented:
 - 当前 analyzer 默认应优先使用本机已登录的 `Codex` CLI；`OPENAI_API_KEY` 路径只作为可选 fallback，不应作为本地单机工作流的默认前提。
 - 当前 Telegram manual intake 第一版已支持：`JD 文本`、`岗位链接 + JD 文本`、以及 `纯 job_url`。
 - 当前 `纯 job_url` capture 由 `Capture` 节点内部负责：使用本机 `Codex` + `Computer Use` 打开网页抓取最小可用 JD / company profile 证据，再输出标准 bundle。
+- 当前 `JD 文本` capture 也会在 `Capture` 节点内部按需补抓 company profile / insights，并在同一次 `Capture` 运行中写入 `company_profile_static` / `company_insights` cache。
 - 当前 Telegram manual intake 第一版只处理配置好的 owner 消息：优先校验 `TELEGRAM_USER_ID`，若未配置则退回到私聊场景下的 `TELEGRAM_CHAT_ID`；bot 自己发出的消息不应进入 intake 流程。
 
 ## Definition Of Done

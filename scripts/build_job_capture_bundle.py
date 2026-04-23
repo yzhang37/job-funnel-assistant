@@ -31,6 +31,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--platform", help="Optional source platform override for the job payload.")
     parser.add_argument("--attachment", action="append", default=[], help="Optional attachment file path. Repeat as needed.")
     parser.add_argument("--note", action="append", default=[], help="Optional bundle note. Repeat as needed.")
+    parser.add_argument("--cache-db", help="Optional SQLite cache database override.")
+    parser.add_argument("--cache-config", help="Optional cache policy config override.")
     return parser.parse_args()
 
 
@@ -57,6 +59,9 @@ def main() -> None:
         posting=posting,
         company_profile=company_profile,
         attachments=args.attachment,
+        repo_root=ROOT,
+        cache_db=args.cache_db,
+        cache_config=args.cache_config,
         source_inputs={"requested_job_url": args.job_url} if args.job_url else None,
         notes=args.note,
     )

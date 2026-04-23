@@ -143,11 +143,7 @@ class CompanyProfileContent:
             featured_customers=[_clean_text(item) for item in payload.get("featured_customers", []) if _clean_text(item)],
             bridge_signals=[_clean_text(item) for item in payload.get("bridge_signals", []) if _clean_text(item)],
             competitor_names=[_clean_text(item) for item in payload.get("competitor_names", []) if _clean_text(item)],
-            headline_metrics={
-                str(key).strip(): value
-                for key, value in payload.get("headline_metrics", {}).items()
-                if str(key).strip()
-            },
+            headline_metrics={key: value for key, value in _normalize_metric_map(payload.get("headline_metrics")).items() if key},
             narrative_sections=sections,
             metric_tables=metric_tables,
             time_series=time_series,
@@ -683,7 +679,7 @@ def _parse_metric_tables(values: list[dict[str, Any]]) -> list[CompanyMetricTabl
                     label=str(raw_row.get("label", "")).strip(),
                     values={
                         str(key).strip(): str(value).strip()
-                        for key, value in raw_row.get("values", {}).items()
+                        for key, value in _normalize_metric_map(raw_row.get("values", raw_row.get("cells"))).items()
                         if str(key).strip() and str(value).strip()
                     },
                 )
@@ -792,11 +788,7 @@ def _parse_source_snapshots(values: list[dict[str, Any]]) -> list[CompanySourceS
                 source_url=source_url,
                 source_platform=source_platform,
                 source_kind=_optional_text(raw.get("source_kind")),
-                headline_metrics={
-                    str(key).strip(): value
-                    for key, value in raw.get("headline_metrics", {}).items()
-                    if str(key).strip()
-                },
+                headline_metrics={key: value for key, value in _normalize_metric_map(raw.get("headline_metrics")).items() if key},
                 bridge_signals=[_clean_text(item) for item in raw.get("bridge_signals", []) if _clean_text(item)],
                 competitor_names=[_clean_text(item) for item in raw.get("competitor_names", []) if _clean_text(item)],
                 narrative_sections=_parse_narrative_sections(raw.get("narrative_sections", raw.get("sections", []))),
@@ -829,6 +821,27 @@ def _clean_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _normalize_metric_map(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return {
+            str(key).strip(): raw_value
+            for key, raw_value in value.items()
+            if str(key).strip()
+        }
+    if isinstance(value, list):
+        normalized: dict[str, Any] = {}
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            key = _clean_text(item.get("name") or item.get("label") or item.get("column"))
+            raw_value = item.get("value")
+            if not key or raw_value in (None, ""):
+                continue
+            normalized[key] = raw_value
+        return normalized
+    return {}
 
 
 def _slugify(text: str) -> str:

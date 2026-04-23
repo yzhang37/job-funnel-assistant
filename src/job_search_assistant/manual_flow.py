@@ -19,6 +19,7 @@ from job_search_assistant.capture import (
     build_job_capture_bundle,
     codex_live_capture_job_url,
     detect_source_platform,
+    enrich_company_profile_for_manual_capture,
     render_company_profile_markdown,
     render_jd_markdown,
 )
@@ -131,29 +132,17 @@ def build_manual_capture_bundle(
         company_profile_payload = None
         company_profile_markdown = None
         if company_name:
-            company_profile = CompanyProfileContent.from_dict(
-                {
-                    "company_name": company_name,
-                    "source_url": request.job_url or f"manual://{request.source_channel}",
-                    "source_platform": source_platform,
-                    "available_signals": ["company_name", "source_url" if request.job_url else "manual_input"],
-                    "missing_signals": ["company_insights", "headcount_metrics", "bridge_signals"],
-                    "notes": [
-                        "当前 company_profile 来自 manual intake 的最小证据包。",
-                        "后续可由 Computer Use capture 进一步补齐公司画像。",
-                    ],
-                    "raw_sections": [
-                        {
-                            "heading": "Manual Intake Context",
-                            "text": request.jd_text[:4000],
-                            "source_label": request.source_channel,
-                            "note": "",
-                        }
-                    ],
-                }
+            company_profile = enrich_company_profile_for_manual_capture(
+                company_name=company_name,
+                job_url=request.job_url,
+                jd_text=request.jd_text,
+                source_platform=source_platform,
+                source_label=request.source_channel,
+                model=model,
             )
-            company_profile_payload = asdict(company_profile)
-            company_profile_markdown = render_company_profile_markdown(company_profile)
+            if company_profile is not None:
+                company_profile_payload = asdict(company_profile)
+                company_profile_markdown = render_company_profile_markdown(company_profile)
     elif request.job_url:
         captured = codex_live_capture_job_url(job_url=request.job_url, model=model)
         job_payload = dict(captured["job_posting"])
@@ -188,6 +177,7 @@ def build_manual_capture_bundle(
         output_dir=bundle_dir,
         posting=posting,
         company_profile=company_profile,
+        repo_root=repo_root,
         source_inputs={
             "input_kind": "manual_intake",
             "source_channel": request.source_channel,

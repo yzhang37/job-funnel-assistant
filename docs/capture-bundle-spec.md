@@ -9,6 +9,7 @@
 - `Capture` 是一个节点
 - `bundle` 是 `Capture` 的输出
 - 不是独立的业务节点
+- `Company Profile / Insights / Cache` 也都是 `Capture` 的内部职责，不应散落到 `Manual Intake`、`Analyzer` 或 `Output`
 
 这层解决的问题不是“怎么抓页面”，而是：
 
@@ -42,6 +43,7 @@
 
 - 这两个接口共享 resolver、company profile capture、cache 等底层能力
 - 第一个接口是主入口，第二个接口适合预热缓存、单独研究公司、补公司画像
+- 当前实现里，`job link -> bundle` 与 `company name -> bundle` 都会在 `Capture` 内部写 `company_profile_static` / `company_insights` cache
 
 ## Bundle Layout
 

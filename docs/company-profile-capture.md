@@ -4,6 +4,12 @@
 
 把“岗位页附带的公司画像”与“公司 Insights 页面”整理成可复用、可缓存、跨平台的 `company_profile` 产物。
 
+当前实现边界已经明确：
+
+- `Company Profile / Insights / Cache` 全部属于 `Capture`
+- `Manual Intake` 只负责把 `job_url` / `jd_text` / `company_name` 交给 `Capture`
+- `Analyzer` 只消费 `Capture` 产出的 bundle 和 company profile 证据
+
 这层的目标不是直接做岗位判断，而是给后续：
 
 1. JD 分析器提供公司级上下文
@@ -20,6 +26,7 @@
 - 第一程序输出的 `company_profile` 应尽量保留证据，不要在 capture 阶段过早浓缩成几条摘要
 - URL 是入口，但真正的浏览器驱动可以来自 `Computer Use`、脚本化浏览器、或其他 agent
 - 在当前项目设计里，真实的 company profile capture 以 `Computer Use` 为前提执行层
+- 当前生产链路里，`company_profile_static` / `company_insights` cache 也在 `Capture` 同一步写入，而不是交给其他组件补写
 
 ## Capture Modes
 
