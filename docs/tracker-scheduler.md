@@ -270,21 +270,22 @@ python3 scripts/prepare_tracker_discovery_batch.py \
 
 ## Current Limitation
 
-当前这层还没有把上面的浏览器实验路径真正接进自动执行。
-
-也就是说：
-
-- 已经有 `trackers.toml`
-- 已经有 due 判断
-- 已经有状态存储
-- 已经有“记录发现到新链接”的接口
-- 已经有把原始 LinkedIn / Indeed URL 规范化成 canonical JD link 的工具层
-
-但真正的：
+当前这层已经有一轮真实的 live browser executor，可用来：
 
 - 打开搜索结果页
 - 点击主结果卡片
 - 读取 `currentJobId` 或 `vjk` / `jk`
-- 一路翻页直到抓够 `target_new_jobs`
+- 返回一批原始 URL
+- 再由 `BrowserDiscoverySession` 规范化、去重并判断 new/existing
 
-仍然需要后续的浏览器执行层来接。
+当前新增的约束是：
+
+- `Tracker` 浏览器执行必须遵守“打开 -> 执行 -> 清理”
+- 宿主机会先打开一个专用 Chrome 自动化窗口
+- 任务结束后只关闭本次自动化新增窗口
+- 不退出 Chrome 进程，不影响用户原有窗口
+
+当前仍然存在的限制主要是：
+
+- live executor 一次运行只完成“一轮 discovery”，还没有接进长期调度器的自动批量编排
+- 如果同一个 tracker 因为大量历史已见链接而需要更深分页，后续还可以继续增强 prompt / host loop

@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from job_search_assistant.runtime import format_kv, get_logger
+from job_search_assistant.runtime import BrowserWindowLease, format_kv, get_logger
 
 
 NARRATIVE_SECTION_SCHEMA: dict[str, Any] = {
@@ -305,6 +305,7 @@ def codex_live_capture_job_url(
         max_attempts=max_attempts,
         event_prefix="capture.live.job_url",
         log_fields={"job_url": job_url},
+        initial_browser_url=job_url,
     )
 
 
@@ -331,6 +332,7 @@ def codex_live_capture_company_name(
             "job_url": job_url,
             "has_jd_text": bool(jd_text),
         },
+        initial_browser_url=job_url,
     )
     return payload.get("company_profile") or {}
 
@@ -343,6 +345,7 @@ def _run_capture_with_retries(
     max_attempts: int,
     event_prefix: str,
     log_fields: dict[str, Any],
+    initial_browser_url: str | None,
 ) -> dict[str, Any]:
     logger.info(format_kv(f"{event_prefix}.requested", model=model, max_attempts=max_attempts, **log_fields))
     codex_bin = shutil.which("codex")
@@ -366,6 +369,8 @@ def _run_capture_with_retries(
                 schema=schema,
                 prompt_text=prompt_text,
                 model=model,
+                task_name=event_prefix,
+                initial_browser_url=initial_browser_url,
             )
             logger.info(format_kv(f"{event_prefix}.attempt.done", attempt=attempt, **log_fields))
             return payload
@@ -392,54 +397,58 @@ def _run_codex_capture_once(
     schema: dict[str, Any],
     prompt_text: str,
     model: str,
+    task_name: str,
+    initial_browser_url: str | None,
 ) -> dict[str, Any]:
     started = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="codex-capture-") as temp_dir:
-        temp_root = Path(temp_dir)
-        schema_path = temp_root / "output_schema.json"
-        schema_path.write_text(json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
-        output_path = temp_root / "last_message.json"
+    with BrowserWindowLease(task_name=task_name, initial_url=initial_browser_url) as lease:
+        full_prompt_text = f"{lease.prompt_hint()}\n\n{prompt_text}".strip()
+        with tempfile.TemporaryDirectory(prefix="codex-capture-") as temp_dir:
+            temp_root = Path(temp_dir)
+            schema_path = temp_root / "output_schema.json"
+            schema_path.write_text(json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
+            output_path = temp_root / "last_message.json"
 
-        command = [
-            codex_bin,
-            "exec",
-            "-C",
-            str(temp_root),
-            "--skip-git-repo-check",
-            "--sandbox",
-            "read-only",
-            "--ephemeral",
-            "--output-schema",
-            str(schema_path),
-            "-o",
-            str(output_path),
-            "-m",
-            model,
-            "-",
-        ]
+            command = [
+                codex_bin,
+                "exec",
+                "-C",
+                str(temp_root),
+                "--skip-git-repo-check",
+                "--sandbox",
+                "read-only",
+                "--ephemeral",
+                "--output-schema",
+                str(schema_path),
+                "-o",
+                str(output_path),
+                "-m",
+                model,
+                "-",
+            ]
 
-        result = subprocess.run(
-            command,
-            input=prompt_text,
-            text=True,
-            capture_output=True,
-            timeout=900,
-            check=False,
-        )
-        if result.returncode != 0:
-            combined = "\n".join(
-                part.strip()
-                for part in (result.stdout, result.stderr)
-                if part and part.strip()
+            result = subprocess.run(
+                command,
+                input=full_prompt_text,
+                text=True,
+                capture_output=True,
+                timeout=900,
+                check=False,
             )
-            raise RuntimeError(f"codex live capture failed with code {result.returncode}: {combined}")
-        if not output_path.exists():
-            raise RuntimeError("codex live capture finished without writing the last-message file.")
-        raw = output_path.read_text(encoding="utf-8").strip()
-        try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Codex live capture returned non-JSON output: {raw}") from exc
+            if result.returncode != 0:
+                combined = "\n".join(
+                    part.strip()
+                    for part in (result.stdout, result.stderr)
+                    if part and part.strip()
+                )
+                raise RuntimeError(f"codex live capture failed with code {result.returncode}: {combined}")
+            if not output_path.exists():
+                raise RuntimeError("codex live capture finished without writing the last-message file.")
+            raw = output_path.read_text(encoding="utf-8").strip()
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Codex live capture returned non-JSON output: {raw}") from exc
 
     duration_ms = int((time.monotonic() - started) * 1000)
     logger.info(format_kv("capture.live.exec.done", duration_ms=duration_ms))
@@ -451,7 +460,7 @@ def _build_job_capture_prompt(job_url: str) -> str:
 
 目标：
 - 输入是一个岗位 URL。
-- 你必须使用 Computer Use 打开 Chrome，访问这个 URL，并抓取足够的信息来生成完整 bundle 所需的岗位信息和公司画像。
+- 你必须使用 Computer Use 操作已经打开好的 Chrome 自动化窗口，并抓取足够的信息来生成完整 bundle 所需的岗位信息和公司画像。
 - 你只做抓取，不做分析，不申请，不点击投递，不发消息。
 
 当前岗位链接：
@@ -522,7 +531,7 @@ def _build_company_profile_prompt(
 
 目标：
 - 输入是公司名，可能附带岗位 URL 和 JD 上下文。
-- 你必须使用 Computer Use 打开 Chrome，抓取这个公司的完整 company profile / insights 证据包。
+- 你必须使用 Computer Use 操作已经打开好的 Chrome 自动化窗口，抓取这个公司的完整 company profile / insights 证据包。
 - 你只做抓取，不做分析，不发消息。
 
 公司名：

@@ -182,6 +182,8 @@ Manual Intake 需要支持的 payload：
 
 - `Tracker` 真实执行依赖 `Computer Use`
 - `Capture` 真实执行也依赖 `Computer Use`
+- `Capture` 的浏览器执行必须遵守“打开 -> 执行 -> 清理”：宿主机先打开专用 Chrome 自动化窗口，任务结束后只关闭本次新增窗口，不退出 Chrome 进程，也不影响用户原有窗口
+- `Tracker` 的浏览器执行也遵守同样的生命周期：宿主机先打开专用 Chrome 自动化窗口，任务结束后只关闭本次新增窗口，不退出 Chrome 进程，也不影响用户原有窗口
 
 原因：
 
@@ -230,6 +232,37 @@ python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto -
 - 支持 `纯岗位链接`
 - `纯岗位链接` 会在 `Capture` 节点里触发本机 `Codex + Computer Use` 的 live browser capture，然后产出标准 bundle 继续交给 `Analyzer`
 - 只处理配置好的 owner 消息：优先读取 `TELEGRAM_USER_ID`；如果没配，则退回到私聊场景下用 `TELEGRAM_CHAT_ID` 限制 chat；bot 自己的回复消息不会进入 intake
+
+## Live Tracker Discovery
+
+当前 `Tracker` 已经支持一轮真实的 live browser discovery：
+
+- 使用本机 `Codex + Computer Use`
+- 在专用 Chrome 自动化窗口里打开 tracker 搜索页
+- 只消费主结果列表
+- 点击岗位卡片并读取原始 URL
+- 由宿主机在任务结束后自动回收本次新增的 Chrome 窗口
+
+手动跑一轮 tracker discovery：
+
+```bash
+python3 scripts/run_tracker_live_discovery.py \
+  --config config/trackers.toml \
+  --db data/cache/tracker_scheduler.sqlite3 \
+  --tracker-id mid_level_software_engineer_linkedin \
+  --model gpt-5.4
+```
+
+如果只是想快速验证浏览器执行层，可以临时把目标缩小：
+
+```bash
+python3 scripts/run_tracker_live_discovery.py \
+  --config config/trackers.toml \
+  --db data/cache/tracker_scheduler.sqlite3 \
+  --tracker-id mid_level_software_engineer_linkedin \
+  --target-new-jobs 5 \
+  --no-record
+```
 
 ## 日志格式
 

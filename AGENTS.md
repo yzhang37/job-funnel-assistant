@@ -42,6 +42,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Operational logs should use single-line structured text with this shape: `<UTC ISO8601> [<Seattle local time>] <LEVEL> <logger_name> event=<event_name> key=value ...`. Prefer machine-stable fields over free-form prose so future CloudWatch-style ingestion remains easy.
 - When a website has no reliable API, browser automation is acceptable. Prefer robust selectors and explicit retry logic.
 - In the current planned system, both `Tracker` execution and `Capture` execution depend on `Computer Use`. Tracker needs it to open search-result pages, click result cards, and paginate; Capture needs it to open job/company pages, expand content, and collect JD/company evidence.
+- Browser automation must be lifecycle-managed. For `Tracker` and `Capture`, the executor should open a dedicated automation window, perform the task there, and then close only the windows created during that task. Do not quit the Chrome process and do not close user-preexisting windows.
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
 - Treat job trackers as the first discovery layer. The scheduler should only discover new job links from configured tracker URLs; it must not perform fit analysis or ranking.
 - Keep tracker configuration minimal and config-driven. Stable fields currently expected are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
@@ -88,6 +89,7 @@ Common expected commands once implemented:
 - record tracker discovery: `python3 scripts/record_tracker_discovery.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3 --tracker-id <tracker_id> --job-url <job_url>`
 - normalize raw tracker URLs to JD links: `python3 scripts/normalize_job_links.py --url <raw_search_or_view_url>`
 - prepare one browser discovery batch: `python3 scripts/prepare_tracker_discovery_batch.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3 --tracker-id <tracker_id> --raw-url <raw_url>`
+- run one live tracker discovery pass: `python3 scripts/run_tracker_live_discovery.py --config config/trackers.toml --db data/cache/tracker_scheduler.sqlite3 --tracker-id <tracker_id> --model gpt-5.4`
 - analyze one job: `python3 scripts/analyze_job_fit.py --job <job.json> --profile <profile.json> --pretty`
 - run funnel analysis: `python3 scripts/run_job_funnel_analysis.py --jd-file <jd.txt> --provider <auto|codex|openai|mock>`
 - render jd markdown: `python3 scripts/render_jd_markdown.py --input <capture.json> --output <jd.md>`
