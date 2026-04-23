@@ -18,7 +18,7 @@ More precise chain:
 
 Current first runnable manual chain:
 
-1. `Manual intake (JD text or URL + JD text)`
+1. `Manual intake (JD text / URL + JD text / URL only)`
 2. `Capture (outputs bundle)`
 3. `Analyzer`
 4. `Output`
@@ -77,8 +77,10 @@ Current first implemented manual-intake constraint:
 - supported:
   - `jd_text`
   - `job_url + jd_text`
-- not yet supported:
-  - `job_url` only, when that would require live browser capture
+  - `job_url` only
+- important boundary:
+  - `Manual Intake` only receives and normalizes input
+  - whether `job_url` requires live browser capture is decided inside `Capture`, not in `Manual Intake`
 
 ## Node Boundary
 
@@ -186,8 +188,9 @@ Recommended policy:
 ## Current Capture Shape
 
 - public interfaces:
-  - `job link -> bundle`
-  - `company name -> bundle`
+- `job link -> bundle`
+- `company name -> bundle`
+- `job_url only -> live browser capture -> bundle` is now part of the `Capture` node and runs locally via `Codex` + `Computer Use`
 - `jd.md`: human-readable normalized posting text
 - `company_profile.md`: human-readable company context, trends, bridge signals, and insights
 - `source_snapshots`: preserve which signals came from the source job board, LinkedIn, official site, or other enrichment sources

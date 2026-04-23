@@ -168,6 +168,7 @@ Current intake-layer progress:
 - current manual chain can already do:
   - input `JD 文本`
   - or input `岗位链接 + JD 文本`
+  - or input `纯 job_url`
   - then `Capture -> Analyzer -> Output`
 - Telegram manual intake owner guard is now part of the expected baseline:
   - only configured owner chat/user messages should be processed
@@ -189,5 +190,6 @@ Current output-layer progress:
   - analyzer cache policy
 - first real local Codex chain has now been validated:
   - `Manual Intake -> Capture -> Codex Analyzer -> Notion -> Telegram`
-- current manual chain still cannot do:
+- current manual chain now supports:
   - `纯 job_url` 自动触发 live browser capture
+  - this path runs inside `Capture` with local `Codex` + `Computer Use`

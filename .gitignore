@@ -13,4 +13,5 @@ examples/reports/
 data/cache/
 *.sqlite3
 data/raw/manual_intake/
+data/logs/
 data/processed/telegram_manual_state.json

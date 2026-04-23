@@ -94,6 +94,7 @@ Common expected commands once implemented:
 - build company profile bundle: `python3 scripts/build_company_profile_bundle.py --input <company_profile.json> --output-dir <bundle_dir>`
 - run one manual intake end-to-end: `python3 scripts/run_manual_intake_once.py --text-file <input.txt> --source-channel telegram --provider auto --write-notion --send-telegram`
 - process Telegram manual-intake updates: `python3 scripts/process_telegram_manual_intake.py --provider auto`
+- install Telegram manual-intake launch agent: `python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full`
 - send one Telegram message from `.env.local`: `python3 scripts/send_telegram_message.py --text "hello"`
 - validate cache layer: `python3 -m py_compile src/job_search_assistant/cache/*.py`
 - run app: `TBD`
@@ -111,8 +112,8 @@ Common expected commands once implemented:
 - `NARR.md` is the narrative baseline document for the project. Do not modify it unless the user explicitly asks for that change.
 - TODO: 当前本地开发可使用 `.env.local` 一类本地 secrets 文件；未来如需长期运行或多机部署，应迁移到更安全的 secrets 管理方案，例如 AWS Secrets Manager。
 - 当前 analyzer 默认应优先使用本机已登录的 `Codex` CLI；`OPENAI_API_KEY` 路径只作为可选 fallback，不应作为本地单机工作流的默认前提。
-- 当前 Telegram manual intake 第一版已支持：`JD 文本` 与 `岗位链接 + JD 文本`。
-- 当前 Telegram manual intake 第一版仍未支持：`纯 job_url` 直接触发 live browser capture。
+- 当前 Telegram manual intake 第一版已支持：`JD 文本`、`岗位链接 + JD 文本`、以及 `纯 job_url`。
+- 当前 `纯 job_url` capture 由 `Capture` 节点内部负责：使用本机 `Codex` + `Computer Use` 打开网页抓取最小可用 JD / company profile 证据，再输出标准 bundle。
 - 当前 Telegram manual intake 第一版只处理配置好的 owner 消息：优先校验 `TELEGRAM_USER_ID`，若未配置则退回到私聊场景下的 `TELEGRAM_CHAT_ID`；bot 自己发出的消息不应进入 intake 流程。
 
 ## Definition Of Done

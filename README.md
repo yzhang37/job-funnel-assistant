@@ -215,11 +215,18 @@ python3 scripts/run_manual_intake_once.py \
 python3 scripts/process_telegram_manual_intake.py --provider auto
 ```
 
+如果要把 Telegram manual intake 部署成本机常驻 `launchd` 服务：
+
+```bash
+python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full
+```
+
 当前 Telegram manual intake 的限制：
 
 - 支持 `JD 文本`
 - 支持 `岗位链接 + JD 文本`
-- 暂不支持 `纯岗位链接` 自动触发 live browser capture
+- 支持 `纯岗位链接`
+- `纯岗位链接` 会在 `Capture` 节点里触发本机 `Codex + Computer Use` 的 live browser capture，然后产出标准 bundle 继续交给 `Analyzer`
 - 只处理配置好的 owner 消息：优先读取 `TELEGRAM_USER_ID`；如果没配，则退回到私聊场景下用 `TELEGRAM_CHAT_ID` 限制 chat；bot 自己的回复消息不会进入 intake
 
 TODO:

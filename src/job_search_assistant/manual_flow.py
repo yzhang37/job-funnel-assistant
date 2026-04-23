@@ -16,6 +16,7 @@ from job_search_assistant.capture import (
     JobPostingContent,
     JobSection,
     build_job_capture_bundle,
+    codex_live_capture_job_url,
     detect_source_platform,
     render_company_profile_markdown,
     render_jd_markdown,
@@ -40,11 +41,14 @@ class CaptureBundleResult:
     bundle_dir: Path
     manifest: dict[str, Any]
     jd_markdown: str
+    job_posting_payload: dict[str, Any]
     company_profile_markdown: str | None
     company_profile_payload: dict[str, Any] | None
 
 
 def looks_like_job_input(request: ManualIntakeRequest) -> bool:
+    if request.job_url:
+        return True
     if request.job_url and request.jd_text:
         return True
     if request.jd_text:
@@ -93,52 +97,78 @@ def build_manual_capture_bundle(
     repo_root: Path,
     request: ManualIntakeRequest,
     output_root: Path,
+    model: str = "gpt-5.4",
 ) -> CaptureBundleResult:
-    if not request.jd_text:
-        raise ValueError("当前 manual capture 仍需要 JD 文本；纯 URL 自动抓取还没有接入这个入口。")
+    if request.jd_text:
+        title = infer_title(request.jd_text) or _infer_title_from_url(request.job_url) or "未命名岗位"
+        company_name = request.company_name or infer_company_name(request.jd_text)
+        source_platform = detect_source_platform(request.job_url) if request.job_url else _platform_from_channel(request.source_channel)
 
-    title = infer_title(request.jd_text) or _infer_title_from_url(request.job_url) or "未命名岗位"
-    company_name = request.company_name or infer_company_name(request.jd_text)
-    source_platform = detect_source_platform(request.job_url) if request.job_url else _platform_from_channel(request.source_channel)
-
-    posting = JobPostingContent(
-        title=title,
-        company=company_name,
-        source_platform=source_platform,
-        source_url=request.job_url,
-        sections=[JobSection(heading="Raw JD Input", paragraphs=_paragraphs_from_text(request.jd_text))],
-        notes=[f"source_channel={request.source_channel}"],
-    )
-
-    company_profile = None
-    company_profile_payload = None
-    company_profile_markdown = None
-    if company_name:
-        company_profile = CompanyProfileContent.from_dict(
-            {
-                "company_name": company_name,
-                "source_url": request.job_url or f"manual://{request.source_channel}",
-                "source_platform": source_platform,
-                "available_signals": ["company_name", "source_url" if request.job_url else "manual_input"],
-                "missing_signals": ["company_insights", "headcount_metrics", "bridge_signals"],
-                "notes": [
-                    "当前 company_profile 来自 manual intake 的最小证据包。",
-                    "后续可由 Computer Use capture 进一步补齐公司画像。",
-                ],
-                "raw_sections": [
-                    {
-                        "heading": "Manual Intake Context",
-                        "text": request.jd_text[:4000],
-                        "source_label": request.source_channel,
-                    }
-                ],
-            }
+        posting = JobPostingContent(
+            title=title,
+            company=company_name,
+            source_platform=source_platform,
+            source_url=request.job_url,
+            sections=[JobSection(heading="Raw JD Input", paragraphs=_paragraphs_from_text(request.jd_text))],
+            notes=[f"source_channel={request.source_channel}"],
         )
-        company_profile_payload = asdict(company_profile)
-        company_profile_markdown = render_company_profile_markdown(company_profile)
+
+        company_profile = None
+        company_profile_payload = None
+        company_profile_markdown = None
+        if company_name:
+            company_profile = CompanyProfileContent.from_dict(
+                {
+                    "company_name": company_name,
+                    "source_url": request.job_url or f"manual://{request.source_channel}",
+                    "source_platform": source_platform,
+                    "available_signals": ["company_name", "source_url" if request.job_url else "manual_input"],
+                    "missing_signals": ["company_insights", "headcount_metrics", "bridge_signals"],
+                    "notes": [
+                        "当前 company_profile 来自 manual intake 的最小证据包。",
+                        "后续可由 Computer Use capture 进一步补齐公司画像。",
+                    ],
+                    "raw_sections": [
+                        {
+                            "heading": "Manual Intake Context",
+                            "text": request.jd_text[:4000],
+                            "source_label": request.source_channel,
+                            "note": "",
+                        }
+                    ],
+                }
+            )
+            company_profile_payload = asdict(company_profile)
+            company_profile_markdown = render_company_profile_markdown(company_profile)
+    elif request.job_url:
+        captured = codex_live_capture_job_url(job_url=request.job_url, model=model)
+        job_payload = dict(captured["job_posting"])
+        if request.company_name and not job_payload.get("company"):
+            job_payload["company"] = request.company_name
+        notes = [str(item).strip() for item in job_payload.get("notes", []) if str(item).strip()]
+        notes.append(f"source_channel={request.source_channel}")
+        job_payload["notes"] = notes
+        posting = JobPostingContent.from_dict(job_payload)
+
+        company_profile = None
+        company_profile_payload = None
+        company_profile_markdown = None
+        company_payload = dict(captured.get("company_profile") or {})
+        if company_payload:
+            if request.company_name and not company_payload.get("company_name"):
+                company_payload["company_name"] = request.company_name
+            if not company_payload.get("source_url"):
+                company_payload["source_url"] = request.job_url
+            if not company_payload.get("source_platform"):
+                company_payload["source_platform"] = posting.source_platform or detect_source_platform(request.job_url)
+            company_profile = CompanyProfileContent.from_dict(company_payload)
+            company_profile_payload = asdict(company_profile)
+            company_profile_markdown = render_company_profile_markdown(company_profile)
+    else:
+        raise ValueError("Manual capture requires either jd_text or job_url.")
 
     run_stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    slug = _slugify(company_name or title)
+    slug = _slugify((posting.company or request.company_name or posting.title))
     bundle_dir = output_root / f"{run_stamp}-{slug}"
     manifest_path = build_job_capture_bundle(
         output_dir=bundle_dir,
@@ -155,6 +185,7 @@ def build_manual_capture_bundle(
         bundle_dir=bundle_dir,
         manifest=manifest,
         jd_markdown=render_jd_markdown(posting),
+        job_posting_payload=asdict(posting),
         company_profile_markdown=company_profile_markdown,
         company_profile_payload=company_profile_payload,
     )
@@ -171,15 +202,21 @@ def run_analysis_for_capture_bundle(
     analysis_mode: str = "full",
     enable_web_search: bool = False,
 ) -> RunResult:
+    resolved_jd_text = request.jd_text or capture_bundle.jd_markdown
+    resolved_company_name = (
+        request.company_name
+        or capture_bundle.job_posting_payload.get("company")
+        or (capture_bundle.company_profile_payload or {}).get("company_name")
+    )
     result = run_analysis(
         repo_root=repo_root,
-        jd_text=request.jd_text or "",
+        jd_text=resolved_jd_text,
         profile_stack_path=profile_stack_path,
         provider_name=provider_name,
         model=model,
         analysis_mode=analysis_mode,
         enable_web_search=enable_web_search,
-        company_name=request.company_name or infer_company_name(request.jd_text or ""),
+        company_name=resolved_company_name,
         job_url=request.job_url,
         notes=request.notes,
         company_profile_payload=capture_bundle.company_profile_payload,
@@ -233,7 +270,12 @@ def build_notion_payload_fields(
     risks = report["risk_unknowns"]
     actions = report["recommended_actions"]
     company_name = request.company_name or infer_company_name(request.jd_text or "")
-    title = infer_title(request.jd_text or "") or "未命名岗位"
+    if not company_name:
+        company_name = (
+            capture_bundle.job_posting_payload.get("company")
+            or (capture_bundle.company_profile_payload or {}).get("company_name")
+        )
+    title = infer_title(request.jd_text or "") or str(capture_bundle.job_posting_payload.get("title") or "未命名岗位")
     company_summary = None
     if capture_bundle.company_profile_markdown:
         company_summary = capture_bundle.company_profile_markdown.splitlines()[0].replace("# ", "", 1)

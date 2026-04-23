@@ -48,6 +48,7 @@ def main() -> None:
         repo_root=ROOT,
         request=request,
         output_root=ROOT / args.bundle_root,
+        model=args.model,
     )
     analysis = run_analysis_for_capture_bundle(
         repo_root=ROOT,

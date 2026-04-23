@@ -57,16 +57,8 @@ def main() -> None:
             _save_state(state_path, state)
             continue
         request = parse_manual_intake_text(message.text, source_channel="telegram")
-        if not request.jd_text:
-            reply = "这条消息目前只有链接，没有 JD 正文。当前 manual intake 先支持“JD 文本”或“URL + JD 文本”一起输入。"
-            if not args.dry_run:
-                telegram.send_message(reply, chat_id=message.chat_id)
-            print(reply)
-            state["last_update_id"] = message.update_id
-            _save_state(state_path, state)
-            continue
         if not looks_like_job_input(request):
-            reply = "这条 Telegram 消息看起来不像岗位输入。请直接发 JD 正文，或发“岗位链接 + JD 正文”一起给我。"
+            reply = "这条 Telegram 消息看起来不像岗位输入。请直接发 JD 正文、岗位链接，或“岗位链接 + JD 正文”。"
             if not args.dry_run:
                 telegram.send_message(reply, chat_id=message.chat_id)
             print(reply)
@@ -78,6 +70,7 @@ def main() -> None:
             repo_root=ROOT,
             request=request,
             output_root=ROOT / args.bundle_root,
+            model=args.model,
         )
         analysis = run_analysis_for_capture_bundle(
             repo_root=ROOT,
