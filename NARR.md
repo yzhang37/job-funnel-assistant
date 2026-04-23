@@ -16,13 +16,22 @@
 4. 自动把结果写入 Notion
 5. 自动把摘要回到 Telegram，方便用户在手机上做决策
 
-当前项目统一收口为 5 个业务组件：
+当前项目统一收口为 7 个系统部件：
+
+其中 5 个是业务组件，2 个是基础设施组件。
+
+5 个业务组件：
 
 1. `Tracker`
 2. `Manual Intake`
 3. `Capture`
 4. `Analyzer`
 5. `Output`
+
+2 个基础设施组件：
+
+6. `MySQL`
+7. `Kafka`
 
 标准链路为：
 
@@ -110,7 +119,7 @@
 
 ### 3.1 用户的核心诉求
 
-用户当前最明确的诉求有 5 个：
+用户当前最明确的诉求有 6 个：
 
 1. 手机优先
    - 最好直接在 Telegram 发内容
@@ -129,6 +138,11 @@
    - `Tracker` 和 `Capture` 都会用到 `Computer Use`
    - 在同一台 Mac 上不能并行抢同一个桌面 / 同一个 Chrome
    - 浏览器执行必须是可调度、可回收、可串行保护的
+6. 运行时必须可热切换、可热插拔
+   - 不能把整条链路绑死在一台电脑或一个本地 SQLite 文件上
+   - 未来允许多台 `Tracker` 机器并行工作
+   - 未来允许多台 `Capture` 机器并行工作
+   - 5 个业务组件之间应通过消息边界通信，而不是强同步函数调用
 
 ### 3.2 当前明确支持的人工输入
 
@@ -291,41 +305,98 @@ Provider 选择顺序：
 
 **Output 是已可用组件。**
 
-## 5. 运行时基础设施层（非业务组件）
+## 5. 七个系统部件与运行时架构
 
-五个业务组件保持不变，但运行时需要明确一层基础设施。
+### 5.1 七个系统部件
 
-### 5.1 Message Queue
+系统级视角下，本项目按 7 个部件收口：
 
-目标：
+1. `Tracker`
+2. `Manual Intake`
+3. `Capture`
+4. `Analyzer`
+5. `Output`
+6. `MySQL`
+7. `Kafka`
 
-- 让 5 个业务组件之间不再直接同步串行调用
-- 每个组件通过消息边界对接下一步
+其中：
 
-目标链路：
+- `Tracker`、`Manual Intake`、`Capture`、`Analyzer`、`Output` 是业务组件
+- `MySQL` 与 `Kafka` 是基础设施组件
 
-- `Tracker / Manual Intake -> Queue -> Capture`
-- `Capture -> Queue -> Analyzer`
-- `Analyzer -> Queue -> Output`
+这个 7 部件模型的目标是：
 
-好处：
+- 让 5 个业务组件低耦合
+- 让组件可以热插拔
+- 让组件可以迁移到别的电脑
+- 让未来多台 `Tracker` 或多台 `Capture` 机器并行工作成为可能
 
-- 解耦
-- 可恢复
-- 可重试
-- 可观测
-- 不会因为 Telegram poller 同步跑完整链路而把体验拖成十几分钟
+### 5.2 MySQL
 
-### 5.2 Browser Execution Broker
-
-这是单机桌面资源的执行仲裁层，不是第六个业务组件。
+`MySQL` 是共享状态与元数据层。
 
 职责：
 
-- 把 `Computer Use` 视为单机独占资源
-- 接收来自 `Tracker` 和 `Capture` 的浏览器任务
+- 提供组件级状态持久化
+- 提供去重、checkpoint、lease、retry、dead-letter 等共享状态能力
+- 保存 bundle / report / output 的元数据索引
+- 提供跨机器热切换所需的共享事实源
+
+设计原则：
+
+- 5 个业务组件都可以有自己的 schema、表前缀、或逻辑数据库边界
+- 组件不能通过“读取别人的本地 SQLite 文件”来通信
+- 跨组件共享的状态必须进入共享数据库
+
+### 5.3 Kafka
+
+`Kafka` 是跨组件消息总线。
+
+职责：
+
+- 让 5 个业务组件之间通过消息边界通信
+- 解耦 producer 与 consumer
+- 支持多机、多 worker、热插拔
+- 让组件扩容时不需要改动其他组件的同步调用链
+
+设计原则：
+
+- 组件之间不再用强同步函数调用串成长链
+- `Tracker` 不直接调 `Capture`
+- `Capture` 不直接同步调 `Analyzer`
+- `Analyzer` 不直接同步调 `Output`
+- 所有跨组件 handoff 都应通过消息总线完成
+
+### 5.4 Message Contracts
+
+当前推荐的消息流方向为：
+
+- `Tracker -> Kafka -> Capture`
+- `Manual Intake -> Kafka -> Capture`
+- `Capture -> Kafka -> Analyzer`
+- `Analyzer -> Kafka -> Output`
+
+推荐的 topic/事件边界包括：
+
+- `tracker.discovery.requested`
+- `tracker.links.discovered`
+- `capture.requested`
+- `capture.browser.requested`
+- `capture.bundle.ready`
+- `analysis.requested`
+- `analysis.ready`
+- `output.requested`
+
+### 5.5 Per-Node Browser Execution Broker
+
+这是**每台机器本地**的桌面资源执行仲裁层，不算进 7 个系统部件。
+
+职责：
+
+- 把 `Computer Use` 视为**每节点独占资源**
+- 接收该节点上来自 `Tracker` 和 `Capture` 的浏览器任务
 - 统一排队
-- 一次只执行一个浏览器任务
+- 在同一台机器上，一次只执行一个浏览器任务
 - 为每个任务管理浏览器窗口生命周期：打开 -> 执行 -> 清理
 - cleanup 只关闭本次任务新增窗口
 - 不退出 Chrome 进程
@@ -335,17 +406,18 @@ Provider 选择顺序：
 
 - `Tracker` 与 `Capture` 都依赖 `Computer Use`
 - 在同一台 Mac 上，它们不能真正并行操作同一个桌面 / 同一个 Chrome
-- 因此它们在运行时必须通过单消费者执行层串行化
+- 但在不同机器上，它们可以各自持有本机的 browser lane 并并行工作
+- 因此 exclusivity 应定义为**每机器本地独占**，而不是全局单实例独占
 
 结论：
 
-**在单机单桌面模型下，`Tracker` 和 `Capture` 不应并行直接使用 `Computer Use`。**
+**在同一台机器上，`Tracker` 和 `Capture` 不应并行直接使用 `Computer Use`；在不同机器上可以并行，但每台机器都必须有自己的本地 browser broker / lock。**
 
 ## 6. 当前代码与文档到底收口在哪一步
 
 ### 6.1 文档收口
 
-当前 `AGENTS.md`、`README.md`、`PLANS.md`、`docs/architecture.md` 的共同收口是：
+当前 `AGENTS.md`、`README.md`、`PLANS.md`、`docs/architecture.md` 与本文件的共同收口是：
 
 全局系统模型：
 
@@ -354,6 +426,8 @@ Provider 选择顺序：
 - `Capture`
 - `Analyzer`
 - `Output`
+- `MySQL`
+- `Kafka`
 
 全局链路：
 
@@ -366,9 +440,10 @@ Provider 选择顺序：
 
 当前运行时原则：
 
-- 5 个业务组件允许通过消息驱动解耦
-- 但所有依赖 `Computer Use` 的浏览器任务必须通过单消费者执行层串行化
-- 在单机单桌面模型下，`Tracker` 和 `Capture` 不应并行直接操作 Chrome
+- 5 个业务组件应通过 `Kafka` 解耦
+- 共享状态与元数据应进入 `MySQL`
+- 所有依赖 `Computer Use` 的浏览器任务必须通过**每节点本地**的 browser broker 串行化
+- 在同一台机器上，`Tracker` 和 `Capture` 不应并行直接操作 Chrome
 
 当前人工链路支持：
 
@@ -404,8 +479,10 @@ Provider 选择顺序：
 
 当前代码尚未完成的运行时点：
 
-- 5 个业务组件之间的消息队列化
-- `Browser Execution Broker` 作为正式单消费者 worker 的落地
+- 7 部件运行时的真正落地
+- `Kafka` 作为正式消息总线的落地
+- `MySQL` 作为正式共享状态层的落地
+- 每节点 `Browser Execution Broker` 作为正式 worker 的落地
 - `Tracker -> Capture -> Analyzer -> Output` 的自动异步衔接
 
 ## 7. 当前已实现需求 vs 未实现需求
@@ -470,10 +547,12 @@ Provider 选择顺序：
 
 未实现：
 
-- `Tracker / Manual Intake -> Queue -> Capture`
-- `Capture -> Queue -> Analyzer`
-- `Analyzer -> Queue -> Output`
-- 单消费者 `Browser Execution Broker`
+- `Tracker -> Kafka -> Capture`
+- `Manual Intake -> Kafka -> Capture`
+- `Capture -> Kafka -> Analyzer`
+- `Analyzer -> Kafka -> Output`
+- `MySQL` 驱动的共享状态 / lease / retry / dedupe
+- 每节点 `Browser Execution Broker`
 
 #### C. 优先级调度
 
@@ -526,9 +605,11 @@ Provider 选择顺序：
 
 下一阶段重点不是再补基础输入能力，而是把运行时从“同步串行调用”演进成：
 
-- 组件之间消息驱动
-- 浏览器任务统一入队
-- 单消费者执行 `Computer Use`
+- 7 部件运行架构
+- 组件之间通过 `Kafka` 消息驱动
+- 共享状态进入 `MySQL`
+- 每节点浏览器任务统一入队
+- 每节点单消费者执行 `Computer Use`
 - 手动任务高于后台 tracker
 
 推荐的优先级模型：
@@ -544,20 +625,23 @@ Provider 选择顺序：
 这是一个：
 
 - 五组件架构已经明确
+- 7 部件运行模型已经明确
 - 文档边界已经稳定
 - 多条关键链路已经真实可用
 - 正在进入运行时解耦阶段的
-- 单机本地工作流系统
+- 准备从单机本地工作流系统演进到多机热插拔运行时的项目
 
 ### 9.2 当前项目最核心的收口
 
 文档层收口在：
 
-- 五组件模型
+- 7 部件模型
 - `Tracker / Manual Intake -> Capture -> Analyzer -> Output`
 - 当前 Manual Intake 支持 `JD 文本`、`URL + JD 文本`、`纯 job_url`
 - `Tracker` 与 `Capture` 都依赖 `Computer Use`
-- 但依赖 `Computer Use` 的任务在未来必须统一进入单消费者执行层
+- 组件之间未来通过 `Kafka` 解耦
+- 共享状态未来通过 `MySQL` 承接
+- 同一台机器上的 `Computer Use` 任务必须进入本地单消费者执行层
 
 代码层收口在：
 
@@ -566,8 +650,10 @@ Provider 选择顺序：
 
 没有收口到：
 
-- 5 组件的消息队列化运行模型
-- `Browser Execution Broker`
+- 7 部件运行时的正式落地
+- `MySQL`
+- `Kafka`
+- 每节点 `Browser Execution Broker`
 - `Tracker -> Capture -> Analyzer -> Output` 的全自动异步串联
 
 ### 9.3 现在最重要的事实
@@ -577,4 +663,4 @@ Provider 选择顺序：
 - 项目不是没做出来
 - 当前 Manual Intake 的三种核心输入都已能进入 `Capture`
 - `Tracker` 与 `Capture` 的浏览器任务都已具备窗口自动回收能力
-- 当前最主要的缺口已经从“输入是否支持”转移到了“运行时如何用消息队列和单消费者模型避免 `Computer Use` 冲突”
+- 当前最主要的缺口已经从“输入是否支持”转移到了“如何把 7 部件运行模型真正落地，并让多机热插拔与每节点浏览器独占同时成立”
