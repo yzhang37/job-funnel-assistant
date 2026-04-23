@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .cache import write_company_profile_cache
+from .cache import write_company_profile_cache, write_job_posting_cache
 from .company_profile import CompanyProfileContent, render_company_profile_markdown
 from .jd_markdown import JobPostingContent, render_jd_markdown
 
@@ -67,7 +67,19 @@ def build_job_capture_bundle(
 
     available_outputs = ["job_posting", "jd_markdown"]
     company_name = posting.company
-    cache_summary: dict[str, int] = {}
+    cache_summary: dict[str, dict[str, int]] = {}
+
+    if repo_root is not None:
+        cache_summary["job_posting"] = write_job_posting_cache(
+            posting,
+            repo_root=Path(repo_root).expanduser().resolve(),
+            cache_db=Path(cache_db).expanduser().resolve() if cache_db else None,
+            cache_config=Path(cache_config).expanduser().resolve() if cache_config else None,
+            metadata={
+                "bundle_kind": "job_capture",
+                "bundle_dir": str(bundle_dir),
+            },
+        )
 
     if company_profile is not None:
         company_payload_path = bundle_dir / "company_profile.json"
@@ -80,7 +92,7 @@ def build_job_capture_bundle(
         available_outputs.extend(["company_profile", "company_profile_markdown"])
         company_name = company_name or company_profile.company_name
         if repo_root is not None:
-            cache_summary = write_company_profile_cache(
+            cache_summary["company_profile"] = write_company_profile_cache(
                 company_profile,
                 repo_root=Path(repo_root).expanduser().resolve(),
                 cache_db=Path(cache_db).expanduser().resolve() if cache_db else None,
@@ -111,7 +123,7 @@ def build_job_capture_bundle(
         "available_outputs": available_outputs,
         "cache": _compact_dict(
             {
-                "company_profile": cache_summary or None,
+                **cache_summary,
             }
         ),
         "notes": [note for note in (notes or []) if note],

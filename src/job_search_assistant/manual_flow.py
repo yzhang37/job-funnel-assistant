@@ -21,6 +21,8 @@ from job_search_assistant.capture import (
     codex_live_capture_job_url,
     detect_source_platform,
     enrich_company_profile_for_manual_capture,
+    load_company_profile_cache,
+    load_job_posting_cache,
     render_company_profile_markdown,
     render_jd_markdown,
 )
@@ -137,45 +139,108 @@ def build_manual_capture_bundle(
         company_profile_payload = None
         company_profile_markdown = None
         if company_name:
-            company_profile = enrich_company_profile_for_manual_capture(
+            company_profile, cache_freshness = load_company_profile_cache(
+                repo_root=repo_root,
                 company_name=company_name,
-                job_url=request.job_url,
-                jd_text=request.jd_text,
-                source_platform=source_platform,
-                source_label=request.source_channel,
-                model=model,
-                browser_broker=browser_broker,
+                source_url=request.job_url,
             )
+            if company_profile is not None:
+                logger.info(
+                    format_kv(
+                        "capture.bundle.company_profile.cache_hit",
+                        company_name=company_name,
+                        freshness=cache_freshness,
+                        source_channel=request.source_channel,
+                    )
+                )
+            else:
+                company_profile = enrich_company_profile_for_manual_capture(
+                    company_name=company_name,
+                    job_url=request.job_url,
+                    jd_text=request.jd_text,
+                    source_platform=source_platform,
+                    source_label=request.source_channel,
+                    model=model,
+                    browser_broker=browser_broker,
+                )
             if company_profile is not None:
                 company_profile_payload = asdict(company_profile)
                 company_profile_markdown = render_company_profile_markdown(company_profile)
     elif request.job_url:
-        if browser_broker is None:
-            captured = codex_live_capture_job_url(job_url=request.job_url, model=model)
-        else:
-            captured = browser_broker.capture_job_url(job_url=request.job_url, model=model)
-        job_payload = dict(captured["job_posting"])
-        if request.company_name and not job_payload.get("company"):
-            job_payload["company"] = request.company_name
-        notes = [str(item).strip() for item in job_payload.get("notes", []) if str(item).strip()]
-        notes.append(f"source_channel={request.source_channel}")
-        job_payload["notes"] = notes
-        posting = JobPostingContent.from_dict(job_payload)
-
+        posting, job_cache_freshness = load_job_posting_cache(
+            repo_root=repo_root,
+            job_url=request.job_url,
+        )
         company_profile = None
         company_profile_payload = None
         company_profile_markdown = None
-        company_payload = dict(captured.get("company_profile") or {})
-        if company_payload:
-            if request.company_name and not company_payload.get("company_name"):
-                company_payload["company_name"] = request.company_name
-            if not company_payload.get("source_url"):
-                company_payload["source_url"] = request.job_url
-            if not company_payload.get("source_platform"):
-                company_payload["source_platform"] = posting.source_platform or detect_source_platform(request.job_url)
-            company_profile = CompanyProfileContent.from_dict(company_payload)
-            company_profile_payload = asdict(company_profile)
-            company_profile_markdown = render_company_profile_markdown(company_profile)
+        if posting is not None:
+            logger.info(
+                format_kv(
+                    "capture.bundle.job_posting.cache_hit",
+                    job_url=request.job_url,
+                    freshness=job_cache_freshness,
+                    source_channel=request.source_channel,
+                )
+            )
+            if request.company_name and not posting.company:
+                posting.company = request.company_name
+            notes = [str(item).strip() for item in posting.notes if str(item).strip()]
+            notes.append(f"source_channel={request.source_channel}")
+            posting.notes = notes
+            company_name = request.company_name or posting.company
+            if company_name:
+                company_profile, company_cache_freshness = load_company_profile_cache(
+                    repo_root=repo_root,
+                    company_name=company_name,
+                    source_url=request.job_url,
+                )
+                if company_profile is not None:
+                    logger.info(
+                        format_kv(
+                            "capture.bundle.company_profile.cache_hit",
+                            company_name=company_name,
+                            freshness=company_cache_freshness,
+                            source_channel=request.source_channel,
+                        )
+                    )
+                else:
+                    company_profile = enrich_company_profile_for_manual_capture(
+                        company_name=company_name,
+                        job_url=request.job_url,
+                        jd_text=render_jd_markdown(posting),
+                        source_platform=posting.source_platform,
+                        source_label=request.source_channel,
+                        model=model,
+                        browser_broker=browser_broker,
+                    )
+            if company_profile is not None:
+                company_profile_payload = asdict(company_profile)
+                company_profile_markdown = render_company_profile_markdown(company_profile)
+        else:
+            if browser_broker is None:
+                captured = codex_live_capture_job_url(job_url=request.job_url, model=model)
+            else:
+                captured = browser_broker.capture_job_url(job_url=request.job_url, model=model)
+            job_payload = dict(captured["job_posting"])
+            if request.company_name and not job_payload.get("company"):
+                job_payload["company"] = request.company_name
+            notes = [str(item).strip() for item in job_payload.get("notes", []) if str(item).strip()]
+            notes.append(f"source_channel={request.source_channel}")
+            job_payload["notes"] = notes
+            posting = JobPostingContent.from_dict(job_payload)
+
+            company_payload = dict(captured.get("company_profile") or {})
+            if company_payload:
+                if request.company_name and not company_payload.get("company_name"):
+                    company_payload["company_name"] = request.company_name
+                if not company_payload.get("source_url"):
+                    company_payload["source_url"] = request.job_url
+                if not company_payload.get("source_platform"):
+                    company_payload["source_platform"] = posting.source_platform or detect_source_platform(request.job_url)
+                company_profile = CompanyProfileContent.from_dict(company_payload)
+                company_profile_payload = asdict(company_profile)
+                company_profile_markdown = render_company_profile_markdown(company_profile)
     else:
         raise ValueError("Manual capture requires either jd_text or job_url.")
 

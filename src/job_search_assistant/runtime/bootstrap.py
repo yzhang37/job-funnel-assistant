@@ -20,6 +20,7 @@ class RuntimeComponents:
 
     def close(self) -> None:
         self.bus.close()
+        self.runtime_store.close()
 
 
 def bootstrap_runtime(repo_root: Path, *, force_logging: bool = False) -> RuntimeComponents:

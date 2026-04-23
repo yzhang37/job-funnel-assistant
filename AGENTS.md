@@ -20,7 +20,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - `templates/`: reusable prompt, analysis, and resume templates
 - `scripts/`: lightweight utility scripts and automation entrypoints
 - `src/`: application code
-- `data/cache/`: SQLite cache files and reusable capture/analyzer snapshots
+- `data/cache/`: legacy SQLite files and reusable local snapshots; active runtime state/cache should prefer MySQL
 - `data/raw/`: raw job capture artifacts
 - `data/processed/`: normalized or scored job records
 - `docs/`: supporting design notes and integration decisions
@@ -108,6 +108,7 @@ Common expected commands once implemented:
 - start local runtime infra (MySQL + Kafka): `./scripts/runtime_infra_up.sh`
 - stop local runtime infra (MySQL + Kafka): `./scripts/runtime_infra_down.sh`
 - initialize local runtime schema and topics: `./.venv/bin/python scripts/init_runtime_infra.py`
+- migrate legacy Capture cache and existing bundles into MySQL: `./.venv/bin/python scripts/migrate_capture_cache_to_mysql.py`
 - enqueue one capture request into Kafka: `./.venv/bin/python scripts/enqueue_capture_request.py --job-url <job_url>`
 - run manual-intake worker once: `./.venv/bin/python scripts/run_manual_intake_service.py --once`
 - run capture worker once: `./.venv/bin/python scripts/run_capture_service.py --once`
@@ -135,7 +136,7 @@ Common expected commands once implemented:
 - 当前 analyzer 默认应优先使用本机已登录的 `Codex` CLI；`OPENAI_API_KEY` 路径只作为可选 fallback，不应作为本地单机工作流的默认前提。
 - 当前 Telegram manual intake 第一版已支持：`JD 文本`、`岗位链接 + JD 文本`、以及 `纯 job_url`。
 - 当前 `纯 job_url` capture 由 `Capture` 节点内部负责：使用本机 `Codex` + `Computer Use` 打开网页抓取最小可用 JD / company profile 证据，再输出标准 bundle。
-- 当前 `JD 文本` capture 也会在 `Capture` 节点内部按需补抓 company profile / insights，并在同一次 `Capture` 运行中写入 `company_profile_static` / `company_insights` cache。
+- 当前 `Capture` cache 已迁到 MySQL runtime store。`job_posting`、`company_profile_static`、`company_insights` 都应由 `Capture` 在 MySQL 中写入并复用；`data/cache/job_search.sqlite3` 仅作为历史迁移来源，不再是主路径。
 - 当前 Telegram manual intake 第一版只处理配置好的 owner 消息：优先校验 `TELEGRAM_USER_ID`，若未配置则退回到私聊场景下的 `TELEGRAM_CHAT_ID`；bot 自己发出的消息不应进入 intake 流程。
 
 ## Definition Of Done

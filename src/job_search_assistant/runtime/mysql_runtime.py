@@ -8,6 +8,8 @@ from typing import Any, Iterator
 import mysql.connector
 from mysql.connector import pooling
 
+from job_search_assistant.cache import CacheEntry
+
 from .config import MySQLSettings
 
 
@@ -153,12 +155,32 @@ class MySQLRuntimeStore:
               PRIMARY KEY (tracker_id, job_url_hash)
             )
             """,
+            """
+            CREATE TABLE IF NOT EXISTS capture_cache_entries (
+              namespace VARCHAR(64) NOT NULL,
+              subject_key VARCHAR(191) NOT NULL,
+              field_name VARCHAR(191) NOT NULL,
+              source_platform VARCHAR(64) NOT NULL DEFAULT '',
+              source_url TEXT NULL,
+              value_json LONGTEXT NOT NULL,
+              observed_at VARCHAR(32) NOT NULL,
+              fresh_until VARCHAR(32) NOT NULL,
+              stale_until VARCHAR(32) NOT NULL,
+              metadata_json LONGTEXT NOT NULL,
+              created_at VARCHAR(32) NOT NULL,
+              updated_at VARCHAR(32) NOT NULL,
+              PRIMARY KEY (namespace, subject_key, field_name, source_platform)
+            )
+            """,
         ]
         with self.connect() as conn:
             cursor = conn.cursor()
             for statement in statements:
                 cursor.execute(statement)
             cursor.close()
+
+    def close(self) -> None:
+        return None
 
     def get_offset(self, offset_key: str, *, default: int = 0) -> int:
         with self.connect() as conn:
@@ -371,6 +393,135 @@ class MySQLRuntimeStore:
             )
             cursor.close()
 
+    def upsert_cache_entry(
+        self,
+        *,
+        namespace: str,
+        subject_key: str,
+        field_name: str,
+        source_platform: str = "",
+        source_url: str | None = None,
+        value: Any,
+        observed_at: datetime,
+        fresh_until: datetime,
+        stale_until: datetime,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        now_text = _to_text(datetime.now(UTC))
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO capture_cache_entries (
+                  namespace,
+                  subject_key,
+                  field_name,
+                  source_platform,
+                  source_url,
+                  value_json,
+                  observed_at,
+                  fresh_until,
+                  stale_until,
+                  metadata_json,
+                  created_at,
+                  updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                  source_url = VALUES(source_url),
+                  value_json = VALUES(value_json),
+                  observed_at = VALUES(observed_at),
+                  fresh_until = VALUES(fresh_until),
+                  stale_until = VALUES(stale_until),
+                  metadata_json = VALUES(metadata_json),
+                  updated_at = VALUES(updated_at)
+                """,
+                (
+                    namespace,
+                    subject_key,
+                    field_name,
+                    source_platform,
+                    source_url,
+                    json.dumps(value, ensure_ascii=False),
+                    _to_text(observed_at),
+                    _to_text(fresh_until),
+                    _to_text(stale_until),
+                    json.dumps(metadata or {}, ensure_ascii=False),
+                    now_text,
+                    now_text,
+                ),
+            )
+            cursor.close()
+
+    def get_cache_entry(
+        self,
+        *,
+        namespace: str,
+        subject_key: str,
+        field_name: str,
+        source_platform: str = "",
+    ) -> CacheEntry | None:
+        with self.connect() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                """
+                SELECT
+                  namespace,
+                  subject_key,
+                  field_name,
+                  source_platform,
+                  source_url,
+                  value_json,
+                  observed_at,
+                  fresh_until,
+                  stale_until,
+                  metadata_json
+                FROM capture_cache_entries
+                WHERE namespace = %s
+                  AND subject_key = %s
+                  AND field_name = %s
+                  AND source_platform = %s
+                """,
+                (namespace, subject_key, field_name, source_platform),
+            )
+            row = cursor.fetchone()
+            cursor.close()
+        return _row_to_cache_entry(row) if row else None
+
+    def list_cache_subject(
+        self,
+        *,
+        namespace: str,
+        subject_key: str,
+        source_platform: str | None = None,
+    ) -> list[CacheEntry]:
+        query = """
+            SELECT
+              namespace,
+              subject_key,
+              field_name,
+              source_platform,
+              source_url,
+              value_json,
+              observed_at,
+              fresh_until,
+              stale_until,
+              metadata_json
+            FROM capture_cache_entries
+            WHERE namespace = %s
+              AND subject_key = %s
+        """
+        params: list[Any] = [namespace, subject_key]
+        if source_platform is not None:
+            query += " AND source_platform = %s"
+            params.append(source_platform)
+        query += " ORDER BY field_name"
+        with self.connect() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(query, tuple(params))
+            rows = cursor.fetchall()
+            cursor.close()
+        return [_row_to_cache_entry(row) for row in rows]
+
     def acquire_runtime_lease(
         self,
         *,
@@ -466,3 +617,18 @@ def _to_text(value: datetime) -> str:
 
 def _from_text(value: str) -> datetime:
     return datetime.strptime(value, TIMESTAMP_FORMAT).replace(tzinfo=UTC)
+
+
+def _row_to_cache_entry(row: dict[str, Any]) -> CacheEntry:
+    return CacheEntry(
+        namespace=str(row["namespace"]),
+        subject_key=str(row["subject_key"]),
+        field_name=str(row["field_name"]),
+        source_platform=str(row["source_platform"]),
+        source_url=str(row["source_url"]) if row["source_url"] is not None else None,
+        value=json.loads(str(row["value_json"])),
+        observed_at=_from_text(str(row["observed_at"])),
+        fresh_until=_from_text(str(row["fresh_until"])),
+        stale_until=_from_text(str(row["stale_until"])),
+        metadata=json.loads(str(row["metadata_json"])),
+    )

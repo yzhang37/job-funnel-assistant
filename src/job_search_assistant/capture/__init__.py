@@ -1,7 +1,14 @@
 """Capture-side helpers for browser-derived job materials."""
 
 from .bundle import build_company_profile_bundle, build_job_capture_bundle
-from .cache import write_company_profile_cache
+from .cache import (
+    build_job_posting_subject_key,
+    build_job_posting_subject_key_from_url,
+    load_company_profile_cache,
+    load_job_posting_cache,
+    write_company_profile_cache,
+    write_job_posting_cache,
+)
 from .company_profile import (
     CompanyMetricRow,
     CompanyMetricTable,
@@ -35,6 +42,8 @@ __all__ = [
     "NotableAlumnus",
     "TimeSeriesPoint",
     "build_company_profile_bundle",
+    "build_job_posting_subject_key",
+    "build_job_posting_subject_key_from_url",
     "build_manual_fallback_company_profile",
     "build_job_capture_bundle",
     "build_company_subject_key",
@@ -42,7 +51,10 @@ __all__ = [
     "codex_live_capture_job_url",
     "detect_source_platform",
     "enrich_company_profile_for_manual_capture",
+    "load_company_profile_cache",
+    "load_job_posting_cache",
     "render_company_profile_markdown",
     "render_jd_markdown",
     "write_company_profile_cache",
+    "write_job_posting_cache",
 ]

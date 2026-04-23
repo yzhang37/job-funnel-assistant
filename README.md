@@ -627,6 +627,12 @@ max_children_per_request = 100
   --job-url "https://www.indeed.com/viewjob?jk=f07957d490af8c1d"
 ```
 
+如果要把旧 SQLite capture cache 和现有 bundle 一次性回填进 MySQL：
+
+```bash
+./.venv/bin/python scripts/migrate_capture_cache_to_mysql.py
+```
+
 ### 停止本地基础设施
 
 ```bash
@@ -738,7 +744,7 @@ max_children_per_request = 100
 - 当前 `Capture` 已经把 `Company Profile / Insights / Cache` 一起收口：
   - `job_url only -> live browser capture -> bundle`
   - `jd_text -> inferred company name -> live company-profile enrichment -> bundle`
-  - 同一次 `Capture` 运行会写入 `company_profile_static` / `company_insights` cache
+  - 同一次 `Capture` 运行会把 `job_posting`、`company_profile_static`、`company_insights` 写入 MySQL cache，并在后续 capture 中优先复用
 
 在这两个公开 capture 接口之前，现在多了一层调度入口：
 
@@ -791,7 +797,7 @@ max_children_per_request = 100
 - `profiles/patches/`: 近期简历更新或特殊补丁
 - `scripts/run_job_funnel_analysis.py`: 新的主入口
 - `scripts/render_jd_markdown.py`: 将 capture 得到的结构化 section 渲染成 `jd.md`
-- `scripts/render_company_profile.py`: 将公司画像 capture 渲染成 `company_profile.md`，并可选写入缓存
+- `scripts/render_company_profile.py`: 将公司画像 capture 渲染成 `company_profile.md`，并可选写入 MySQL cache
 - `scripts/build_job_capture_bundle.py`: 生成标准化 job bundle
 - `scripts/build_company_profile_bundle.py`: 生成标准化 company profile bundle
 - `scripts/capture_company_profile_from_name.py`: 用本机 `Codex` + `Computer Use` 从公司名 live 抓取 `company_profile bundle`
@@ -804,7 +810,8 @@ max_children_per_request = 100
 - `scripts/record_tracker_discovery.py`: 记录一次 tracker 运行发现了哪些 job links
 - `examples/jd_example.md`: 示例 JD
 - `examples/company_profile_example.json`: 示例公司画像输入
-- `src/job_search_assistant/cache/`: 配置驱动的缓存策略与 SQLite 存储
+- `src/job_search_assistant/cache/`: 配置驱动的缓存策略定义与历史 SQLite helper
+- `scripts/migrate_capture_cache_to_mysql.py`: 将旧 SQLite capture cache 与现有 bundle 回填到 MySQL
 - `src/job_search_assistant/capture/`: browser capture 的最小文本整理层
 - `src/job_search_assistant/tracker_scheduler/`: tracker 配置、due 逻辑、存储抽象与 SQLite 第一版实现
 - `docs/company-profile-capture.md`: company profile capture spec
@@ -1049,7 +1056,7 @@ python3 scripts/prepare_tracker_discovery_batch.py \
 - TTL 不写死在代码里，而是放在 `config/cache_policy.toml`
 - 支持三层继承：`defaults -> profiles.<namespace> -> [[rules]] 字段级覆盖`
 - 同一 namespace 下，不同字段可以有不同 freshness 策略
-- 数据库存储使用 SQLite，适合本地单用户工作流
+- 运行时主缓存存储使用 MySQL，便于 queue-driven runtime、多 worker 和热切换；旧 SQLite 只保留为历史迁移来源
 
 当前推荐的缓存 namespace：
 
