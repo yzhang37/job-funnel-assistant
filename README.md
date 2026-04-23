@@ -430,11 +430,32 @@ TODO:
 当前仓库里的默认本地配置在：
 
 - `config/runtime.toml`
+- `config/integrations.toml`
 
 当前验证通过的默认端口：
 
 - MySQL: `127.0.0.1:3307`
 - Kafka: `127.0.0.1:9092`
+
+### 集成配置
+
+当前 `Notion` 写页的 children append 批大小不是硬编码，放在：
+
+- `config/integrations.toml`
+
+例如：
+
+```toml
+[notion]
+max_children_per_request = 100
+```
+
+当前写页逻辑会：
+
+1. 先创建 Notion 页面
+2. 再按 `max_children_per_request` 分批 append blocks
+
+这样可以避免长报告把 `原始 JD`、`公司画像`、`Insights` 截断掉。
 
 ### 本地启动顺序
 

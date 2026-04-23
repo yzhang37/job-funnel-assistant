@@ -1,0 +1,4 @@
+version = 1
+
+[notion]
+max_children_per_request = 100

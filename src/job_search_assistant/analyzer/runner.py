@@ -54,6 +54,18 @@ def run_analysis(
         company_profile_payload=company_profile_payload,
         bundle_manifest=bundle_manifest,
     )
+    logger.info(
+        format_kv(
+            "analysis.input.ready",
+            profile_fragment_count=len(loaded_profile.fragments),
+            image_count=len(packet.image_paths),
+            has_company_profile=bool(company_profile_payload),
+            has_bundle_manifest=bool(bundle_manifest),
+            jd_chars=len(jd_text),
+            company=company_name or packet.company_name,
+            job_url=job_url,
+        )
+    )
     developer_prompt = _build_developer_prompt(repo_root, loaded_profile.combined_markdown, analysis_mode)
     user_text = _build_user_text(packet, loaded_profile.fragments)
 
@@ -69,6 +81,7 @@ def run_analysis(
             web_search_enabled=enable_web_search,
         )
     )
+    provider_started = time.monotonic()
     response = provider.run(
         ProviderRequest(
             repo_root=repo_root,
@@ -81,7 +94,26 @@ def run_analysis(
             enable_web_search=enable_web_search,
         )
     )
+    provider_duration_ms = int((time.monotonic() - provider_started) * 1000)
+    logger.info(
+        format_kv(
+            "analysis.provider.response",
+            provider=provider.__class__.__name__,
+            model=model,
+            analysis_mode=analysis_mode,
+            duration_ms=provider_duration_ms,
+            response_keys=",".join(sorted(response.keys())),
+        )
+    )
     validate_report_shape(response)
+    logger.info(
+        format_kv(
+            "analysis.schema.validated",
+            provider=provider.__class__.__name__,
+            model=model,
+            analysis_mode=analysis_mode,
+        )
+    )
 
     payload = {
         "run_metadata": {
@@ -96,6 +128,14 @@ def run_analysis(
         **response,
     }
     markdown = render_markdown(payload)
+    logger.info(
+        format_kv(
+            "analysis.rendered",
+            markdown_chars=len(markdown),
+            report_section_count=len(payload.get("report", {})),
+            company=company_name or packet.company_name,
+        )
+    )
     duration_ms = int((time.monotonic() - started) * 1000)
     report = payload["report"]
     verdict = report["executive_verdict"]
@@ -114,14 +154,27 @@ def run_analysis(
 
 
 def save_outputs(result: RunResult, markdown_path: str | Path | None, json_path: str | Path | None) -> None:
+    markdown_bytes = None
+    json_bytes = None
     if markdown_path:
         output = Path(markdown_path)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(result.markdown, encoding="utf-8")
+        markdown_bytes = output.stat().st_size
     if json_path:
         output = Path(json_path)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result.payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        json_bytes = output.stat().st_size
+    logger.info(
+        format_kv(
+            "analysis.outputs.saved",
+            markdown_path=markdown_path,
+            markdown_bytes=markdown_bytes,
+            json_path=json_path,
+            json_bytes=json_bytes,
+        )
+    )
 
 
 def _select_provider(provider_name: str) -> MockProvider | OpenAIResponsesProvider | CodexExecProvider:
