@@ -101,6 +101,8 @@ Common expected commands once implemented:
 - run one manual intake end-to-end: `python3 scripts/run_manual_intake_once.py --text-file <input.txt> --source-channel telegram --provider auto --write-notion --send-telegram`
 - process Telegram manual-intake updates: `python3 scripts/process_telegram_manual_intake.py --provider auto`
 - install Telegram manual-intake launch agent: `python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full`
+- install queue-driven runtime launch agents and cut over from legacy Telegram intake: `./.venv/bin/python scripts/install_runtime_launch_agents.py`
+- uninstall queue-driven runtime launch agents: `./.venv/bin/python scripts/uninstall_runtime_launch_agents.py`
 - send one Telegram message from `.env.local`: `python3 scripts/send_telegram_message.py --text "hello"`
 - bootstrap local runtime python env: `./scripts/bootstrap_runtime_env.sh`
 - start local runtime infra (MySQL + Kafka): `./scripts/runtime_infra_up.sh`
@@ -113,6 +115,8 @@ Common expected commands once implemented:
 - run output worker once: `./.venv/bin/python scripts/run_output_service.py --once`
 - run tracker worker once: `./.venv/bin/python scripts/run_tracker_service.py --once --config config/trackers.toml`
 - run one local queue-driven smoke test: `./.venv/bin/python scripts/runtime_smoke_test.py --job-url <job_url> --reply-chat-id <telegram_chat_id>`
+- inspect runtime launch-agent status: `launchctl list | rg 'com.yzhang.jobfunnel.runtime|com.yzhang.jobfunnel.telegram-manual-intake'`
+- tail runtime worker logs: `tail -f data/logs/runtime/manual-intake.out.log data/logs/runtime/capture.out.log data/logs/runtime/analyzer.out.log data/logs/runtime/output.out.log data/logs/runtime/tracker.out.log`
 - validate cache layer: `python3 -m py_compile src/job_search_assistant/cache/*.py`
 - run app: `TBD`
 - run automation: `TBD`

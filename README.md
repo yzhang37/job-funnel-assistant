@@ -225,6 +225,117 @@ python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto -
 
 当前安装脚本会把执行环境的 `PATH` 一并写进 `launchd` plist，确保后台任务能找到本机 `codex` CLI 与 Anaconda Python。
 
+## 当前推荐部署：7 部件 queue-driven runtime
+
+现在推荐把旧的同步 Telegram poller 下线，切到新的 queue-driven runtime：
+
+- `Tracker`
+- `Manual Intake`
+- `Capture`
+- `Analyzer`
+- `Output`
+- `MySQL`
+- `Kafka`
+
+其中：
+
+- `MySQL` 负责共享状态、offset、job metadata、lease
+- `Kafka` 负责 5 个业务组件之间的消息传递
+- `Browser Execution Broker` 是**每台浏览器节点本地**的运行时驱动层，不单独算作系统部件
+
+### 一次性准备
+
+先准备 Python 运行环境：
+
+```bash
+./scripts/bootstrap_runtime_env.sh
+```
+
+再启动本地 MySQL + Kafka：
+
+```bash
+./scripts/runtime_infra_up.sh
+```
+
+然后初始化 schema 和 Kafka topics：
+
+```bash
+./.venv/bin/python scripts/init_runtime_infra.py
+```
+
+### 切换到新 runtime
+
+安装并启动新的 5 个 runtime worker：
+
+```bash
+./.venv/bin/python scripts/install_runtime_launch_agents.py
+```
+
+这个命令会做几件事：
+
+- 关闭旧的 `com.yzhang.jobfunnel.telegram-manual-intake`
+- 把旧 `data/processed/telegram_manual_state.json` 的 `last_update_id` 迁进 MySQL runtime state
+- 安装并启动新的 launch agents：
+  - `com.yzhang.jobfunnel.runtime.manual-intake`
+  - `com.yzhang.jobfunnel.runtime.capture`
+  - `com.yzhang.jobfunnel.runtime.analyzer`
+  - `com.yzhang.jobfunnel.runtime.output`
+  - `com.yzhang.jobfunnel.runtime.tracker`
+
+### 查看状态
+
+查看 launch agents：
+
+```bash
+launchctl list | rg 'com.yzhang.jobfunnel.runtime|com.yzhang.jobfunnel.telegram-manual-intake'
+```
+
+查看日志：
+
+```bash
+tail -f data/logs/runtime/manual-intake.out.log
+tail -f data/logs/runtime/capture.out.log
+tail -f data/logs/runtime/analyzer.out.log
+tail -f data/logs/runtime/output.out.log
+tail -f data/logs/runtime/tracker.out.log
+```
+
+旧同步链路的日志仍然在：
+
+```bash
+data/logs/telegram_manual_intake.out.log
+data/logs/telegram_manual_intake.err.log
+```
+
+但切流后不应再继续增长。
+
+### 卸载 runtime workers
+
+如果要停掉新的 runtime launch agents：
+
+```bash
+./.venv/bin/python scripts/uninstall_runtime_launch_agents.py
+```
+
+### Queue-driven smoke test
+
+不经过 Telegram，也可以直接打一条本地 smoke test：
+
+```bash
+./.venv/bin/python scripts/runtime_smoke_test.py \
+  --job-url <job_url> \
+  --reply-chat-id <telegram_chat_id>
+```
+
+这个 smoke test 会按顺序触发：
+
+- `capture.requested`
+- `Capture`
+- `Analyzer`
+- `Output`
+
+用来验证新的 queue-driven runtime 是否完整可用。
+
 当前 Telegram manual intake 的限制：
 
 - 支持 `JD 文本`
