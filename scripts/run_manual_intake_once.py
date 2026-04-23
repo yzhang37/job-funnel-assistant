@@ -17,6 +17,7 @@ from job_search_assistant.manual_flow import (
     build_manual_capture_bundle,
     build_notion_payload_fields,
     build_telegram_short_message,
+    normalize_manual_intake_request,
     parse_manual_intake_text,
     run_analysis_for_capture_bundle,
 )
@@ -50,6 +51,11 @@ def main() -> None:
     started = time.monotonic()
     raw_text = args.text or Path(args.text_file).read_text(encoding="utf-8")
     request = parse_manual_intake_text(raw_text, source_channel=args.source_channel)
+    request = normalize_manual_intake_request(
+        repo_root=ROOT,
+        request=request,
+        model=args.model,
+    )
     logger.info(
         format_kv(
             "manual_intake.once.start",

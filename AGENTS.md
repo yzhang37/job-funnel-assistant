@@ -63,6 +63,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
   - More precisely:
     - `(Tracker)` / `(Manual Intake)` -> `Capture (outputs bundle)` -> `Analyzer` -> `Output`
 - Manual intake should expose one user-facing entry that accepts multiple payload types: `job_url`, `jd_text`, optional `attachments`, optional `company_name`, and optional `notes`. Different channels should not fork the downstream pipeline.
+- Manual intake normalization should prefer the local `Codex` LLM for structured field extraction from recruiter emails, informal messages, and mixed Chinese/English job text. Do not rely on weak regex-only title/company heuristics as the primary path.
 - `Output` is a first-class system component. It receives analyzer results and decides how to render and route them, for example:
   - write/update the Notion analysis page
   - send the Telegram short reply

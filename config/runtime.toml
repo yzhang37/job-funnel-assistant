@@ -45,6 +45,7 @@ poll_interval_seconds = 30
 consumer_group = "job-funnel-manual-intake"
 source_channel = "telegram"
 send_ack = true
+model = "gpt-5.4"
 
 [services.capture]
 poll_interval_seconds = 5

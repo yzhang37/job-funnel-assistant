@@ -176,6 +176,7 @@ JOB_POSTING_SCHEMA: dict[str, Any] = {
         "title": {"type": "string"},
         "company": {"type": "string"},
         "location": {"type": "string"},
+        "employment_type": {"type": "string"},
         "source_platform": {"type": "string"},
         "source_url": {"type": "string"},
         "signals": {"type": "array", "items": {"type": "string"}},
@@ -200,6 +201,7 @@ JOB_POSTING_SCHEMA: dict[str, Any] = {
         "title",
         "company",
         "location",
+        "employment_type",
         "source_platform",
         "source_url",
         "signals",
@@ -496,6 +498,7 @@ def _build_job_capture_prompt(job_url: str) -> str:
    - title
    - company
    - location
+   - employment_type
    - source_platform
    - source_url
    - signals

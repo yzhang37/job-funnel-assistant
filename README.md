@@ -80,6 +80,22 @@ Manual Intake 需要支持的 payload：
 
 这层不应该因为入口不同而分叉后续流程。无论来自 Telegram、邮件还是 web form，后面都应该走同一个 capture / analyzer 链路。
 
+当前主路径里，`Manual Intake` 会先用本机 `Codex` 做一次结构化 normalization，再把结果交给 `Capture`。这一步会抽取：
+
+- `job_title`
+- 展示公司名 / 抓取公司名
+- `hiring_company` / `vendor_company`
+- `location`
+- `employment_type`
+- recruiter 姓名 / 邮箱 / 电话
+- end client 是否明确披露
+
+对于 recruiter / vendor 邮件：
+
+- 如果 end client 没有明确披露，系统会保留 vendor 公司用于展示
+- 但不会把 vendor 当成真实 hiring company 去抓公司画像
+- 这时 `Capture` 会跳过 company-profile enrichment，而不是胡乱猜公司
+
 ## 全局节点
 
 当前全局链路应该理解成：
@@ -299,6 +315,11 @@ tail -f data/logs/runtime/analyzer.out.log
 tail -f data/logs/runtime/output.out.log
 tail -f data/logs/runtime/tracker.out.log
 ```
+
+`manual-intake` worker 现在也会记录结构化 normalization 日志，例如：
+
+- `manual_intake.normalize.start`
+- `manual_intake.normalize.done`
 
 旧同步链路的日志仍然在：
 

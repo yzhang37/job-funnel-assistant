@@ -24,6 +24,7 @@ class JobPostingContent:
     title: str
     company: str | None = None
     location: str | None = None
+    employment_type: str | None = None
     source_platform: str | None = None
     source_url: str | None = None
     signals: list[str] = field(default_factory=list)
@@ -48,6 +49,7 @@ class JobPostingContent:
             title=str(payload.get("title", "")).strip(),
             company=_optional_text(payload.get("company")),
             location=_optional_text(payload.get("location")),
+            employment_type=_optional_text(payload.get("employment_type")),
             source_platform=_optional_text(payload.get("source_platform")),
             source_url=_optional_text(payload.get("source_url")),
             signals=[str(item).strip() for item in payload.get("signals", []) if str(item).strip()],
@@ -70,6 +72,8 @@ def render_jd_markdown(posting: JobPostingContent) -> str:
         meta_lines.append(f"- 公司: {posting.company}")
     if posting.location:
         meta_lines.append(f"- 地点: {posting.location}")
+    if posting.employment_type:
+        meta_lines.append(f"- 用工类型: {posting.employment_type}")
     if posting.source_platform:
         meta_lines.append(f"- 来源平台: {posting.source_platform}")
     if posting.source_url:

@@ -35,6 +35,7 @@ def run_analysis(
     analysis_mode: str = "quick",
     enable_web_search: bool = False,
     company_name: str | None = None,
+    guessed_title: str | None = None,
     job_url: str | None = None,
     special_questions: str | None = None,
     image_paths: list[str] | None = None,
@@ -47,6 +48,7 @@ def run_analysis(
     packet = build_job_packet(
         jd_text=jd_text,
         company_name=company_name,
+        guessed_title=guessed_title,
         job_url=job_url,
         special_questions=special_questions,
         image_paths=image_paths,

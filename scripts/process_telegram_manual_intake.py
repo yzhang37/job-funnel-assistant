@@ -19,6 +19,7 @@ from job_search_assistant.manual_flow import (
     build_notion_payload_fields,
     build_telegram_short_message,
     looks_like_job_input,
+    normalize_manual_intake_request,
     parse_manual_intake_text,
     run_analysis_for_capture_bundle,
 )
@@ -108,6 +109,11 @@ def main() -> None:
             state["last_update_id"] = message.update_id
             _save_state(state_path, state)
             continue
+        request = normalize_manual_intake_request(
+            repo_root=ROOT,
+            request=request,
+            model=args.model,
+        )
 
         notion_started = None
         capture_bundle = build_manual_capture_bundle(

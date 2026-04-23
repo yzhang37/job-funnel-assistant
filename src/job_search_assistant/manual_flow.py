@@ -11,7 +11,6 @@ from typing import Any
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from job_search_assistant.analyzer.job_packet import infer_company_name, infer_title
 from job_search_assistant.analyzer.runner import RunResult, run_analysis, save_outputs
 from job_search_assistant.capture import (
     CompanyProfileContent,
@@ -26,6 +25,7 @@ from job_search_assistant.capture import (
     render_company_profile_markdown,
     render_jd_markdown,
 )
+from job_search_assistant.manual_intake_normalizer import normalize_manual_intake
 from job_search_assistant.runtime import format_kv, get_logger
 
 if TYPE_CHECKING:
@@ -43,6 +43,21 @@ class ManualIntakeRequest:
     job_url: str | None
     jd_text: str | None
     company_name: str | None = None
+    position_name: str | None = None
+    capture_company_name: str | None = None
+    hiring_company: str | None = None
+    vendor_company: str | None = None
+    location: str | None = None
+    employment_type: str | None = None
+    recruiter_name: str | None = None
+    recruiter_email: str | None = None
+    recruiter_phone: str | None = None
+    input_kind: str | None = None
+    end_client_disclosed: bool | None = None
+    should_enrich_company_profile: bool = True
+    field_confidence: dict[str, str] | None = None
+    field_evidence: dict[str, str] | None = None
+    normalization_payload: dict[str, Any] | None = None
     notes: str | None = None
 
 
@@ -102,6 +117,50 @@ def parse_manual_intake_text(raw_text: str, *, source_channel: str) -> ManualInt
     )
 
 
+def normalize_manual_intake_request(
+    *,
+    repo_root: Path,
+    request: ManualIntakeRequest,
+    model: str = "gpt-5.4",
+) -> ManualIntakeRequest:
+    normalized = normalize_manual_intake(
+        repo_root=repo_root,
+        raw_text=request.raw_text,
+        source_channel=request.source_channel,
+        detected_job_url=request.job_url,
+        model=model,
+    )
+    job_url = normalized.job_url or request.job_url
+    company_name = normalized.company_name_for_display or request.company_name
+    capture_company_name = normalized.company_name_for_capture
+    should_enrich_company_profile = bool(normalized.should_enrich_company_profile)
+    if request.job_url:
+        should_enrich_company_profile = True
+    return ManualIntakeRequest(
+        source_channel=request.source_channel,
+        raw_text=request.raw_text,
+        job_url=job_url,
+        jd_text=request.jd_text,
+        company_name=company_name,
+        position_name=normalized.job_title,
+        capture_company_name=capture_company_name,
+        hiring_company=normalized.hiring_company,
+        vendor_company=normalized.vendor_company,
+        location=normalized.location,
+        employment_type=normalized.employment_type,
+        recruiter_name=normalized.recruiter_name,
+        recruiter_email=normalized.recruiter_email,
+        recruiter_phone=normalized.recruiter_phone,
+        input_kind=normalized.input_kind,
+        end_client_disclosed=normalized.end_client_disclosed,
+        should_enrich_company_profile=should_enrich_company_profile,
+        field_confidence=normalized.field_confidence,
+        field_evidence=normalized.field_evidence,
+        normalization_payload=normalized.raw_payload,
+        notes=_merge_manual_intake_notes(request.notes, normalized.notes),
+    )
+
+
 def build_manual_capture_bundle(
     *,
     repo_root: Path,
@@ -122,40 +181,45 @@ def build_manual_capture_bundle(
         )
     )
     if request.jd_text:
-        title = infer_title(request.jd_text) or _infer_title_from_url(request.job_url) or "未命名岗位"
-        company_name = request.company_name or infer_company_name(request.jd_text)
+        title = request.position_name or _infer_title_from_url(request.job_url) or "未命名岗位"
+        display_company_name = request.company_name
+        capture_company_name = request.capture_company_name or (
+            request.company_name if request.should_enrich_company_profile else None
+        )
         source_platform = detect_source_platform(request.job_url) if request.job_url else _platform_from_channel(request.source_channel)
 
         posting = JobPostingContent(
             title=title,
-            company=company_name,
+            company=display_company_name,
+            location=request.location,
+            employment_type=request.employment_type,
             source_platform=source_platform,
             source_url=request.job_url,
             sections=[JobSection(heading="Raw JD Input", paragraphs=_paragraphs_from_text(request.jd_text))],
-            notes=[f"source_channel={request.source_channel}"],
+            notes=_posting_notes(request),
         )
 
         company_profile = None
         company_profile_payload = None
         company_profile_markdown = None
-        if company_name:
+        if capture_company_name:
             company_profile, cache_freshness = load_company_profile_cache(
                 repo_root=repo_root,
-                company_name=company_name,
+                company_name=capture_company_name,
                 source_url=request.job_url,
             )
             if company_profile is not None:
                 logger.info(
                     format_kv(
                         "capture.bundle.company_profile.cache_hit",
-                        company_name=company_name,
+                        company_name=capture_company_name,
                         freshness=cache_freshness,
                         source_channel=request.source_channel,
                     )
                 )
             else:
                 company_profile = enrich_company_profile_for_manual_capture(
-                    company_name=company_name,
+                    company_name=capture_company_name,
                     job_url=request.job_url,
                     jd_text=request.jd_text,
                     source_platform=source_platform,
@@ -185,11 +249,13 @@ def build_manual_capture_bundle(
             )
             if request.company_name and not posting.company:
                 posting.company = request.company_name
-            notes = [str(item).strip() for item in posting.notes if str(item).strip()]
-            notes.append(f"source_channel={request.source_channel}")
-            posting.notes = notes
-            company_name = request.company_name or posting.company
-            if company_name:
+            if request.location and not posting.location:
+                posting.location = request.location
+            if request.employment_type and not posting.employment_type:
+                posting.employment_type = request.employment_type
+            posting.notes = _merge_posting_notes(posting.notes, _posting_notes(request))
+            company_name = request.capture_company_name or posting.company
+            if company_name and request.should_enrich_company_profile:
                 company_profile, company_cache_freshness = load_company_profile_cache(
                     repo_root=repo_root,
                     company_name=company_name,
@@ -223,17 +289,21 @@ def build_manual_capture_bundle(
             else:
                 captured = browser_broker.capture_job_url(job_url=request.job_url, model=model)
             job_payload = dict(captured["job_posting"])
+            if request.position_name and not job_payload.get("title"):
+                job_payload["title"] = request.position_name
             if request.company_name and not job_payload.get("company"):
                 job_payload["company"] = request.company_name
-            notes = [str(item).strip() for item in job_payload.get("notes", []) if str(item).strip()]
-            notes.append(f"source_channel={request.source_channel}")
-            job_payload["notes"] = notes
+            if request.location and not job_payload.get("location"):
+                job_payload["location"] = request.location
+            if request.employment_type and not job_payload.get("employment_type"):
+                job_payload["employment_type"] = request.employment_type
+            job_payload["notes"] = _merge_posting_notes(job_payload.get("notes", []), _posting_notes(request))
             posting = JobPostingContent.from_dict(job_payload)
 
             company_payload = dict(captured.get("company_profile") or {})
             if company_payload:
-                if request.company_name and not company_payload.get("company_name"):
-                    company_payload["company_name"] = request.company_name
+                if request.capture_company_name and not company_payload.get("company_name"):
+                    company_payload["company_name"] = request.capture_company_name
                 if not company_payload.get("source_url"):
                     company_payload["source_url"] = request.job_url
                 if not company_payload.get("source_platform"):
@@ -307,8 +377,9 @@ def run_analysis_for_capture_bundle(
         analysis_mode=analysis_mode,
         enable_web_search=enable_web_search,
         company_name=resolved_company_name,
+        guessed_title=request.position_name or str(capture_bundle.job_posting_payload.get("title") or "") or None,
         job_url=request.job_url,
-        notes=request.notes,
+        notes=_analysis_notes(request),
         company_profile_payload=capture_bundle.company_profile_payload,
         bundle_manifest=capture_bundle.manifest,
     )
@@ -394,13 +465,13 @@ def build_notion_payload_fields(
     fit = report["candidate_fit_analysis"]
     risks = report["risk_unknowns"]
     actions = report["recommended_actions"]
-    company_name = request.company_name or infer_company_name(request.jd_text or "")
+    company_name = request.company_name
     if not company_name:
         company_name = (
             capture_bundle.job_posting_payload.get("company")
             or (capture_bundle.company_profile_payload or {}).get("company_name")
         )
-    title = infer_title(request.jd_text or "") or str(capture_bundle.job_posting_payload.get("title") or "未命名岗位")
+    title = request.position_name or str(capture_bundle.job_posting_payload.get("title") or "未命名岗位")
     company_summary = None
     if capture_bundle.company_profile_markdown:
         company_summary = capture_bundle.company_profile_markdown.splitlines()[0].replace("# ", "", 1)
@@ -428,6 +499,72 @@ def build_notion_payload_fields(
 
 def _paragraphs_from_text(text: str) -> list[str]:
     return [paragraph.strip() for paragraph in re.split(r"\n\s*\n", text) if paragraph.strip()]
+
+
+def _posting_notes(request: ManualIntakeRequest) -> list[str]:
+    notes = [f"source_channel={request.source_channel}"]
+    if request.input_kind:
+        notes.append(f"input_kind={request.input_kind}")
+    if request.hiring_company:
+        notes.append(f"hiring_company={request.hiring_company}")
+    if request.vendor_company:
+        notes.append(f"vendor_company={request.vendor_company}")
+    if request.recruiter_name:
+        notes.append(f"recruiter_name={request.recruiter_name}")
+    if request.recruiter_email:
+        notes.append(f"recruiter_email={request.recruiter_email}")
+    if request.recruiter_phone:
+        notes.append(f"recruiter_phone={request.recruiter_phone}")
+    if request.end_client_disclosed is not None:
+        notes.append(f"end_client_disclosed={str(request.end_client_disclosed).lower()}")
+    return notes
+
+
+def _merge_posting_notes(existing: list[str] | None, additions: list[str]) -> list[str]:
+    merged: list[str] = []
+    for item in list(existing or []) + list(additions):
+        text = str(item).strip()
+        if text and text not in merged:
+            merged.append(text)
+    return merged
+
+
+def _merge_manual_intake_notes(existing: str | None, normalized: str | None) -> str | None:
+    parts = [part.strip() for part in (existing, normalized) if part and part.strip()]
+    if not parts:
+        return None
+    return "\n".join(parts)
+
+
+def _analysis_notes(request: ManualIntakeRequest) -> str | None:
+    lines = [line for line in (request.notes or "").splitlines() if line.strip()]
+    if request.input_kind:
+        lines.append(f"normalized_input_kind: {request.input_kind}")
+    if request.company_name:
+        lines.append(f"display_company_name: {request.company_name}")
+    if request.hiring_company:
+        lines.append(f"hiring_company: {request.hiring_company}")
+    if request.vendor_company:
+        lines.append(f"vendor_company: {request.vendor_company}")
+    if request.location:
+        lines.append(f"location: {request.location}")
+    if request.employment_type:
+        lines.append(f"employment_type: {request.employment_type}")
+    if request.recruiter_name:
+        lines.append(f"recruiter_name: {request.recruiter_name}")
+    if request.recruiter_email:
+        lines.append(f"recruiter_email: {request.recruiter_email}")
+    if request.recruiter_phone:
+        lines.append(f"recruiter_phone: {request.recruiter_phone}")
+    if request.end_client_disclosed is not None:
+        lines.append(f"end_client_disclosed: {str(request.end_client_disclosed).lower()}")
+    if request.field_evidence:
+        evidence_lines = [f"{key}={value}" for key, value in request.field_evidence.items() if value]
+        if evidence_lines:
+            lines.append("field_evidence: " + " | ".join(evidence_lines))
+    if not lines:
+        return None
+    return "\n".join(lines)
 
 
 def _slugify(value: str) -> str:

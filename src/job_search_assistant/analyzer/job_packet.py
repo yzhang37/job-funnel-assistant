@@ -48,6 +48,7 @@ def build_job_packet(
     *,
     jd_text: str,
     company_name: str | None = None,
+    guessed_title: str | None = None,
     job_url: str | None = None,
     special_questions: str | None = None,
     image_paths: list[str] | None = None,
@@ -58,7 +59,7 @@ def build_job_packet(
     resolved_images = [Path(path).resolve() for path in (image_paths or [])]
     return JobPacket(
         company_name=company_name or infer_company_name(jd_text),
-        guessed_title=infer_title(jd_text),
+        guessed_title=guessed_title or infer_title(jd_text),
         job_url=job_url,
         raw_jd_text=jd_text.strip(),
         special_questions=special_questions.strip() if special_questions else None,

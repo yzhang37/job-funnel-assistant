@@ -12,7 +12,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from job_search_assistant.manual_flow import parse_manual_intake_text
+from job_search_assistant.manual_flow import normalize_manual_intake_request, parse_manual_intake_text
 from job_search_assistant.runtime import format_kv, get_logger
 from job_search_assistant.runtime.bootstrap import bootstrap_runtime
 
@@ -38,6 +38,10 @@ def main() -> None:
     try:
         raw_text = args.text or Path(args.text_file).read_text(encoding="utf-8")
         request = parse_manual_intake_text(raw_text, source_channel=args.source_channel)
+        request = normalize_manual_intake_request(
+            repo_root=ROOT,
+            request=request,
+        )
         request_id = str(uuid.uuid4())
         payload = {
             "request_id": request_id,
@@ -47,6 +51,21 @@ def main() -> None:
             "job_url": request.job_url,
             "jd_text": request.jd_text,
             "company_name": request.company_name,
+            "position_name": request.position_name,
+            "capture_company_name": request.capture_company_name,
+            "hiring_company": request.hiring_company,
+            "vendor_company": request.vendor_company,
+            "location": request.location,
+            "employment_type": request.employment_type,
+            "recruiter_name": request.recruiter_name,
+            "recruiter_email": request.recruiter_email,
+            "recruiter_phone": request.recruiter_phone,
+            "input_kind": request.input_kind,
+            "end_client_disclosed": request.end_client_disclosed,
+            "should_enrich_company_profile": request.should_enrich_company_profile,
+            "field_confidence": request.field_confidence,
+            "field_evidence": request.field_evidence,
+            "normalization_payload": request.normalization_payload,
             "notes": request.notes,
             "reply_chat_id": args.reply_chat_id,
             "send_telegram_reply": args.send_telegram_reply,
