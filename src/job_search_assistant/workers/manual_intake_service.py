@@ -15,11 +15,18 @@ logger = get_logger("service.manual_intake")
 
 
 class ManualIntakeService:
-    def __init__(self, *, settings: RuntimeSettings, bus: KafkaEventBus, runtime_store: MySQLRuntimeStore) -> None:
+    def __init__(
+        self,
+        *,
+        settings: RuntimeSettings,
+        bus: KafkaEventBus,
+        runtime_store: MySQLRuntimeStore,
+        telegram_client: TelegramBotClient | None = None,
+    ) -> None:
         self.settings = settings
         self.bus = bus
         self.runtime_store = runtime_store
-        self.telegram = TelegramBotClient()
+        self.telegram = telegram_client or TelegramBotClient()
 
     def run_once(self) -> int:
         last_update_id = self.runtime_store.get_offset("telegram:last_update_id", default=0)

@@ -24,6 +24,8 @@ lane_name = "default"
 lock_dir = "data/runtime/browser_broker"
 acquire_timeout_seconds = 1800
 poll_interval_seconds = 2
+preflight_required = true
+preflight_codex_timeout_seconds = 90
 
 [topics]
 tracker_discovery_requested = "tracker.discovery.requested"

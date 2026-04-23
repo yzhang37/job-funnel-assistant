@@ -26,6 +26,7 @@ def main() -> None:
     runtime = bootstrap_runtime(ROOT, force_logging=True)
     service = None
     try:
+        runtime.browser_broker.preflight(model=str(runtime.settings.capture.extras.get("model", "gpt-5.4")))
         service = CaptureService(
             settings=runtime.settings,
             bus=runtime.bus,

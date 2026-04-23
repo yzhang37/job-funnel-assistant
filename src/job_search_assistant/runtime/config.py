@@ -50,6 +50,8 @@ class BrowserBrokerSettings:
     lock_dir: Path
     acquire_timeout_seconds: int
     poll_interval_seconds: int
+    preflight_required: bool
+    preflight_codex_timeout_seconds: int
 
 
 @dataclass(frozen=True)
@@ -143,6 +145,16 @@ def load_runtime_settings(repo_root: Path, path: str | Path = "config/runtime.to
         poll_interval_seconds=int(
             _env("JOB_SEARCH_BROWSER_POLL_INTERVAL_SECONDS", broker_payload["poll_interval_seconds"])
         ),
+        preflight_required=_env_bool(
+            "JOB_SEARCH_BROWSER_PREFLIGHT_REQUIRED",
+            broker_payload.get("preflight_required", True),
+        ),
+        preflight_codex_timeout_seconds=int(
+            _env(
+                "JOB_SEARCH_BROWSER_PREFLIGHT_CODEX_TIMEOUT_SECONDS",
+                broker_payload.get("preflight_codex_timeout_seconds", 90),
+            )
+        ),
     )
 
     topics_payload = dict(payload["topics"])
@@ -192,6 +204,13 @@ def _env(name: str, default: Any) -> str:
     if value is None or value == "":
         return str(default)
     return value
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return bool(default)
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _resolve_path(repo_root: Path, value: str) -> Path:

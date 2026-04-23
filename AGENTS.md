@@ -44,6 +44,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - When a website has no reliable API, browser automation is acceptable. Prefer robust selectors and explicit retry logic.
 - In the current planned system, both `Tracker` execution and `Capture` execution depend on `Computer Use`. Tracker needs it to open search-result pages, click result cards, and paginate; Capture needs it to open job/company pages, expand content, and collect JD/company evidence.
 - Browser automation must be lifecycle-managed. For `Tracker` and `Capture`, the executor should open a dedicated automation window, perform the task there, and then close only the windows created during that task. Do not quit the Chrome process and do not close user-preexisting windows.
+- Browser-capable nodes should run a broker-level preflight before starting long-running `Tracker` / `Capture` workers. The preflight must warm up Chrome window automation and a minimal `Codex + Computer Use` probe; if critical permissions are missing, startup should fail fast with an actionable remediation message instead of hanging mid-task.
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
 - Treat job trackers as the first discovery layer. The scheduler should only discover new job links from configured tracker URLs; it must not perform fit analysis or ranking.
 - Keep tracker configuration minimal and config-driven. Stable fields currently expected are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
@@ -103,6 +104,7 @@ Common expected commands once implemented:
 - process Telegram manual-intake updates: `python3 scripts/process_telegram_manual_intake.py --provider auto`
 - install Telegram manual-intake launch agent: `python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full`
 - install queue-driven runtime launch agents and cut over from legacy Telegram intake: `./.venv/bin/python scripts/install_runtime_launch_agents.py`
+- run browser node preflight once (or re-run with `--force` after permissions change): `./.venv/bin/python scripts/run_browser_preflight.py --force`
 - uninstall queue-driven runtime launch agents: `./.venv/bin/python scripts/uninstall_runtime_launch_agents.py`
 - send one Telegram message from `.env.local`: `python3 scripts/send_telegram_message.py --text "hello"`
 - bootstrap local runtime python env: `./scripts/bootstrap_runtime_env.sh`
@@ -117,6 +119,8 @@ Common expected commands once implemented:
 - run output worker once: `./.venv/bin/python scripts/run_output_service.py --once`
 - run tracker worker once: `./.venv/bin/python scripts/run_tracker_service.py --once --config config/trackers.toml`
 - run one local queue-driven smoke test: `./.venv/bin/python scripts/runtime_smoke_test.py --job-url <job_url> --reply-chat-id <telegram_chat_id>`
+- run stable unit + fixed e2e predeploy checks: `./.venv/bin/python scripts/run_predeploy_checks.py`
+- run predeploy checks plus one live smoke: `./.venv/bin/python scripts/run_predeploy_checks.py --run-live-smoke --job-url <job_url> --reply-chat-id <telegram_chat_id>`
 - inspect runtime launch-agent status: `launchctl list | rg 'com.yzhang.jobfunnel.runtime|com.yzhang.jobfunnel.telegram-manual-intake'`
 - tail runtime worker logs: `tail -f data/logs/runtime/manual-intake.out.log data/logs/runtime/capture.out.log data/logs/runtime/analyzer.out.log data/logs/runtime/output.out.log data/logs/runtime/tracker.out.log`
 - validate cache layer: `python3 -m py_compile src/job_search_assistant/cache/*.py`

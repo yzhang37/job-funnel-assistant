@@ -677,3 +677,150 @@ Provider 选择顺序：
 - 当前 Manual Intake 的三种核心输入都已能进入 `Capture`
 - `Tracker` 与 `Capture` 的浏览器任务都已具备窗口自动回收能力
 - 当前最主要的缺口已经从“输入是否支持”转移到了“如何把 7 部件运行模型真正落地，并让多机热插拔与每节点浏览器独占同时成立”
+
+## 10. 2026-04-23 实现对账更新
+
+本节是对前文的**追加更新**，用于记录截至 `2026-04-23` 的真实代码/部署状态。  
+若与上文较早阶段的“未实现”表述冲突，应以本节为准；上文保留，作为历史叙事痕迹，不在此处删除。
+
+### 10.1 已经正式落地的运行时
+
+当前仓库已经不再只停留在“单机同步脚本”阶段，而是已经落地了本地 `7` 部件运行时：
+
+- `Tracker`
+- `Manual Intake`
+- `Capture`
+- `Analyzer`
+- `Output`
+- `MySQL`
+- `Kafka`
+
+其中：
+
+- `MySQL` 已承接 runtime 主状态、offset、job metadata、lease，以及 `Capture` 主缓存
+- `Kafka` 已承接业务组件之间的消息传递
+- `Browser Execution Broker` 已作为**每节点本地浏览器驱动/代理层**存在
+
+### 10.2 已经正式落地的异步消息链路
+
+前文 `7.2 未实现需求 / B. 消息队列化执行模型` 中提到的下列目标，当前已经有代码和本地部署实现：
+
+- `Manual Intake -> Kafka -> Capture`
+- `Capture -> Kafka -> Analyzer`
+- `Analyzer -> Kafka -> Output`
+- `MySQL` 驱动的共享状态 / lease / retry 基础能力
+- 每节点 `Browser Execution Broker`
+
+当前这条链路已经替代旧的同步 Telegram poller 成为推荐主路径。  
+旧链路仍保留在仓库中，主要用于历史兼容、调试或迁移，不再是首选生产部署方式。
+
+### 10.3 Browser Execution Broker 的真实状态
+
+`Browser Execution Broker` 当前已经不是纯设计概念，而是已落地的运行时抽象。
+
+当前已实现：
+
+- `Tracker` 与 `Capture` 不直接依赖裸的 `Computer Use`
+- 它们通过本机 broker 抽象申请浏览器执行能力
+- broker 在本机管理：
+  - 浏览器 lane lease
+  - Chrome 窗口生命周期
+  - `打开 -> 执行 -> 清理`
+  - 本机独占约束
+
+当前还没有演进到：
+
+- 跨节点统一 broker 服务
+- 多节点共享的 browser task 调度平面
+
+因此当前正确口径是：
+
+- **浏览器独占是每节点本地独占**
+- **不是全局单实例独占**
+
+### 10.4 启动期权限预热与 fail-fast 已落地
+
+此前系统的一个实际问题是：
+
+- 浏览器任务运行中途才弹出 macOS 权限框
+- 进程表面上像“卡死”
+- 无法满足无人值守要求
+
+当前该问题已补上正式机制：
+
+- browser-capable 节点在启动长驻 `Tracker` / `Capture` worker 前，应先运行 broker-level preflight
+- preflight 会真实验证：
+  - Chrome 窗口控制
+  - 一个最小 `Codex + Computer Use` 探针
+- 若权限未就绪，应直接失败退出，并给出 remediation，而不是在中途挂住
+
+### 10.5 Manual Intake 的结构化识别已改为 Codex LLM 主路径
+
+此前 `Manual Intake` 在 `jd_text` 路径上主要依赖弱启发式：
+
+- `infer_title(...)`
+- `infer_company_name(...)`
+
+这对 recruiter email、混合中英文本、非标准 JD 样式不稳定。
+
+当前主路径已更新为：
+
+- 使用本机 `Codex` LLM 做结构化 normalization
+
+已抽取/规范化的字段包括但不限于：
+
+- `job_title`
+- `hiring_company`
+- `vendor_company`
+- `company_name_for_display`
+- `company_name_for_capture`
+- `location`
+- `employment_type`
+- `recruiter_name / recruiter_email / recruiter_phone`
+- `field_confidence`
+- `field_evidence`
+
+因此，当前项目对 recruiter email 的处理能力，已经不应再按“弱正则启发式”为主来理解。
+
+### 10.6 Capture cache 已迁到 MySQL 主路径
+
+此前 `Capture` 的 cache 主要保存在本地 SQLite 中。  
+当前真实状态是：
+
+- `job_posting`
+- `company_profile_static`
+- `company_insights`
+
+这三类 cache 已迁到 `MySQL runtime store` 主路径。
+
+当前口径应为：
+
+- `data/cache/job_search.sqlite3` 仅作为历史迁移来源
+- 主运行路径不再依赖它作为 Capture cache source of truth
+
+### 10.7 测试与部署前检查已经补上
+
+此前仓库在“生产部署前检查”方面偏弱，更多依赖人工经验。  
+当前已经补上：
+
+- 固定的 `unittest` 回归覆盖
+- `compileall` 级别的基础检查
+- 部署前一键检查脚本
+- browser preflight 脚本
+
+因此当前不应再把项目描述为“只有手工冒烟，没有固定测试与 predeploy gate”。
+
+### 10.8 当前仍然成立的剩余缺口
+
+即使有上述落地，以下问题仍然是有效的后续项：
+
+- `Tracker -> Capture -> Analyzer -> Output` 的全自动异步闭环仍需继续打磨，尤其是 backlog、优先级与失败重试体验
+- `Browser Execution Broker` 目前是本机抽象层，不是跨节点统一调度平面
+- 多节点热插拔的系统性验证仍需继续补强
+- 旧链路与新链路的遗留代码、脚本、文档仍需持续收口
+
+因此，当前项目应被理解为：
+
+- **7 部件运行时已经落地**
+- **核心异步链路已经可跑**
+- **但离彻底收口、完全多机化、彻底去遗留路径，还有持续工程化工作要做**

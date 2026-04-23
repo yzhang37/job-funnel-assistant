@@ -28,6 +28,7 @@ def main() -> None:
     runtime = bootstrap_runtime(ROOT, force_logging=True)
     service = None
     try:
+        runtime.browser_broker.preflight(model=str(runtime.settings.tracker.extras.get("model", "gpt-5.4")))
         tracker_config = load_tracker_config(ROOT / args.config)
         service = TrackerService(
             settings=runtime.settings,

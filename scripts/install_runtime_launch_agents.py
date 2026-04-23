@@ -51,6 +51,16 @@ def parse_args() -> argparse.Namespace:
         action="store_false",
         help="Do not disable the legacy synchronous Telegram poller.",
     )
+    parser.add_argument(
+        "--skip-browser-preflight",
+        action="store_true",
+        help="Skip browser node preflight before enabling capture/tracker workers.",
+    )
+    parser.add_argument(
+        "--browser-preflight-model",
+        default="",
+        help="Optional model override for browser preflight; defaults to services.capture.model.",
+    )
     return parser.parse_args()
 
 
@@ -69,6 +79,9 @@ def main() -> None:
     try:
         ensure_runtime_ready(runtime)
         migrated_offset = _migrate_legacy_offset(runtime, ROOT / args.legacy_state_file)
+        if not args.skip_browser_preflight:
+            preflight_model = args.browser_preflight_model or str(runtime.settings.capture.extras.get("model", "gpt-5.4"))
+            runtime.browser_broker.preflight(model=preflight_model)
     finally:
         runtime.close()
 

@@ -279,6 +279,19 @@ python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto -
 ./.venv/bin/python scripts/init_runtime_infra.py
 ```
 
+如果这台机器承担 `Tracker` / `Capture` 这类浏览器节点角色，建议先做一次 broker-level 预检：
+
+```bash
+./.venv/bin/python scripts/run_browser_preflight.py --force
+```
+
+这一步会真实执行：
+
+- Chrome 自动化窗口的打开 / 清理
+- 一个最小 `Codex + Computer Use` 探针
+
+如果 macOS 权限没有给全，它会直接失败并提示你去系统设置里重新允许，而不是等到后台任务跑到一半再卡住。
+
 ### 切换到新 runtime
 
 安装并启动新的 5 个 runtime worker：
@@ -291,6 +304,7 @@ python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto -
 
 - 关闭旧的 `com.yzhang.jobfunnel.telegram-manual-intake`
 - 把旧 `data/processed/telegram_manual_state.json` 的 `last_update_id` 迁进 MySQL runtime state
+- 默认先跑一次 browser preflight；如果 `Codex + Computer Use` 权限未就绪，会直接失败退出
 - 安装并启动新的 launch agents：
   - `com.yzhang.jobfunnel.runtime.manual-intake`
   - `com.yzhang.jobfunnel.runtime.capture`
@@ -356,6 +370,33 @@ data/logs/telegram_manual_intake.err.log
 - `Output`
 
 用来验证新的 queue-driven runtime 是否完整可用。
+
+### 固定回归 / 部署前检查
+
+现在仓库里已经有一层固定化测试，用来覆盖已经稳定下来的行为：
+
+- `tests/test_manual_flow.py`
+  - `Manual Intake` 结构化字段映射
+  - vendor-only recruiter 邮件不会误抓 vendor 公司画像
+  - `job_url only` 不会被新的 normalizer 回归改坏
+  - 从原始输入到 Notion/Telegram 标题渲染的固定 smoke
+- `tests/test_manual_intake_service.py`
+  - runtime `manual-intake` worker 会把结构化字段正确入队
+
+部署前建议至少跑：
+
+```bash
+./.venv/bin/python scripts/run_predeploy_checks.py
+```
+
+如果还想把当前本机 runtime 真烟测一遍，再跑：
+
+```bash
+./.venv/bin/python scripts/run_predeploy_checks.py \
+  --run-live-smoke \
+  --job-url <job_url> \
+  --reply-chat-id <telegram_chat_id>
+```
 
 当前 Telegram manual intake 的限制：
 
