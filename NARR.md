@@ -393,6 +393,8 @@ Provider 选择顺序：
 
 职责：
 
+- 作为浏览器自动化的通用驱动/代理层存在
+- 向业务组件暴露统一的浏览器执行抽象，而不是让业务组件直接依赖裸的 `Computer Use`
 - 把 `Computer Use` 视为**每节点独占资源**
 - 接收该节点上来自 `Tracker` 和 `Capture` 的浏览器任务
 - 统一排队
@@ -404,14 +406,24 @@ Provider 选择顺序：
 
 存在原因：
 
-- `Tracker` 与 `Capture` 都依赖 `Computer Use`
+- `Tracker` 与 `Capture` 都需要浏览器自动化能力
+- 业务组件应该依赖 `Browser Execution Broker` 抽象，而不是直接依赖裸的 `Computer Use`
+- 当前 broker 的一个实现可以是：`Codex + Computer Use`
 - 在同一台 Mac 上，它们不能真正并行操作同一个桌面 / 同一个 Chrome
 - 但在不同机器上，它们可以各自持有本机的 browser lane 并并行工作
 - 因此 exclusivity 应定义为**每机器本地独占**，而不是全局单实例独占
 
+设计原则：
+
+- `Tracker` / `Capture` 依赖 broker 抽象
+- broker 再去依赖具体实现，例如 `Codex + Computer Use`
+- browser lane、窗口生命周期、重试、排队、lease 都属于 broker 责任，而不是业务组件责任
+- 同一台机器上可以同时部署多个业务组件，但它们共享同一个本地 broker
+- 只有具备浏览器能力的节点才需要运行本地 broker
+
 结论：
 
-**在同一台机器上，`Tracker` 和 `Capture` 不应并行直接使用 `Computer Use`；在不同机器上可以并行，但每台机器都必须有自己的本地 browser broker / lock。**
+**在同一台机器上，`Tracker` 和 `Capture` 不应并行直接使用 `Computer Use`；它们应统一通过本地 `Browser Execution Broker` 访问浏览器能力。在不同机器上可以并行，但每台机器都必须有自己的本地 broker / lock。**
 
 ## 6. 当前代码与文档到底收口在哪一步
 
@@ -442,7 +454,8 @@ Provider 选择顺序：
 
 - 5 个业务组件应通过 `Kafka` 解耦
 - 共享状态与元数据应进入 `MySQL`
-- 所有依赖 `Computer Use` 的浏览器任务必须通过**每节点本地**的 browser broker 串行化
+- 所有浏览器自动化任务都应通过**每节点本地**的 `Browser Execution Broker` 串行化
+- 业务组件依赖 broker 抽象，不应直接依赖裸的 `Computer Use`
 - 在同一台机器上，`Tracker` 和 `Capture` 不应并行直接操作 Chrome
 
 当前人工链路支持：
@@ -638,10 +651,10 @@ Provider 选择顺序：
 - 7 部件模型
 - `Tracker / Manual Intake -> Capture -> Analyzer -> Output`
 - 当前 Manual Intake 支持 `JD 文本`、`URL + JD 文本`、`纯 job_url`
-- `Tracker` 与 `Capture` 都依赖 `Computer Use`
+- `Tracker` 与 `Capture` 都需要浏览器自动化，但它们应依赖 `Browser Execution Broker` 抽象
 - 组件之间未来通过 `Kafka` 解耦
 - 共享状态未来通过 `MySQL` 承接
-- 同一台机器上的 `Computer Use` 任务必须进入本地单消费者执行层
+- 同一台机器上的浏览器任务必须进入本地单消费者 broker 层
 
 代码层收口在：
 
