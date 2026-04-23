@@ -108,6 +108,7 @@ Common expected commands once implemented:
 - Notifications should summarize and link; they should not trigger irreversible actions.
 - Treat resumes, credentials, and personal data as sensitive.
 - Prefer dry-run support for scraping, analysis, and notification steps.
+- `NARR.md` is the narrative baseline document for the project. Do not modify it unless the user explicitly asks for that change.
 - TODO: 当前本地开发可使用 `.env.local` 一类本地 secrets 文件；未来如需长期运行或多机部署，应迁移到更安全的 secrets 管理方案，例如 AWS Secrets Manager。
 - 当前 analyzer 默认应优先使用本机已登录的 `Codex` CLI；`OPENAI_API_KEY` 路径只作为可选 fallback，不应作为本地单机工作流的默认前提。
 - 当前 Telegram manual intake 第一版已支持：`JD 文本` 与 `岗位链接 + JD 文本`。
