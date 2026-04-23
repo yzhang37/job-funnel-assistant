@@ -12,7 +12,10 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from job_search_assistant.integrations import TelegramBotClient
-from job_search_assistant.runtime import load_local_env
+from job_search_assistant.runtime import configure_logging, format_kv, get_logger, load_local_env
+
+
+logger = get_logger("telegram.send")
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,6 +28,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main(args: argparse.Namespace) -> None:
+    configure_logging(force=True)
     load_local_env(ROOT)
     client = TelegramBotClient()
     text = args.text
@@ -33,7 +37,14 @@ def main(args: argparse.Namespace) -> None:
     if not text:
         raise SystemExit("No message text provided.")
     result = client.send_message(text, chat_id=args.chat_id)
-    print(result["result"]["message_id"])
+    logger.info(
+        format_kv(
+            "telegram.send.done",
+            chat_id=args.chat_id or client.default_chat_id,
+            message_id=result["result"]["message_id"],
+            text_chars=len(text),
+        )
+    )
 
 
 if __name__ == "__main__":

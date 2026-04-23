@@ -39,6 +39,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Distinguish clearly between background intake and manual intake. Background intake is tracker-driven and scheduled; manual intake is user-driven and should accept arbitrary job links, JD text, and attachments.
 - Treat Telegram as the preferred manual intake channel for mobile-first use. Email forward is a secondary/manual fallback rather than the primary interactive surface.
 - Additional manual intake surfaces such as share sheet shortcuts and a lightweight web form are valid complements when they reduce friction, but they should map into the same internal request shape.
+- Operational logs should use single-line structured text with this shape: `<UTC ISO8601> [<Seattle local time>] <LEVEL> <logger_name> event=<event_name> key=value ...`. Prefer machine-stable fields over free-form prose so future CloudWatch-style ingestion remains easy.
 - When a website has no reliable API, browser automation is acceptable. Prefer robust selectors and explicit retry logic.
 - In the current planned system, both `Tracker` execution and `Capture` execution depend on `Computer Use`. Tracker needs it to open search-result pages, click result cards, and paginate; Capture needs it to open job/company pages, expand content, and collect JD/company evidence.
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.

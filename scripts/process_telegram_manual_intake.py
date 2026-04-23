@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 
@@ -21,7 +22,10 @@ from job_search_assistant.manual_flow import (
     parse_manual_intake_text,
     run_analysis_for_capture_bundle,
 )
-from job_search_assistant.runtime import load_local_env
+from job_search_assistant.runtime import configure_logging, format_kv, get_logger, load_local_env
+
+
+logger = get_logger("telegram.manual_intake")
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,33 +43,73 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    configure_logging(force=True)
     load_local_env(ROOT)
     state_path = ROOT / args.state_file
     state = _load_state(state_path)
+    logger.info(
+        format_kv(
+            "telegram.poll.start",
+            state_file=state_path,
+            last_update_id=state.get("last_update_id", 0),
+            provider=args.provider,
+            model=args.model,
+            analysis_mode=args.analysis_mode,
+            dry_run=args.dry_run,
+        )
+    )
 
     telegram = TelegramBotClient()
     updates = telegram.get_updates(offset=state.get("last_update_id", 0) + 1)
     if not updates:
-        print("No new Telegram updates.")
+        logger.debug(format_kv("telegram.poll.empty", last_update_id=state.get("last_update_id", 0)))
         return
+    logger.info(format_kv("telegram.poll.received", update_count=len(updates)))
 
     notion = None if args.dry_run else NotionAnalysisReportClient()
 
     for message in updates:
+        message_started = time.monotonic()
         if not telegram.is_owner_message(message):
+            logger.warning(
+                format_kv(
+                    "telegram.poll.ignored_non_owner",
+                    update_id=message.update_id,
+                    chat_id=message.chat_id,
+                    from_user_id=message.from_user_id,
+                    from_is_bot=message.from_is_bot,
+                )
+            )
             state["last_update_id"] = message.update_id
             _save_state(state_path, state)
             continue
+        logger.info(
+            format_kv(
+                "telegram.poll.accepted",
+                update_id=message.update_id,
+                chat_id=message.chat_id,
+                message_id=message.message_id,
+                text_preview=message.text[:160],
+            )
+        )
         request = parse_manual_intake_text(message.text, source_channel="telegram")
         if not looks_like_job_input(request):
             reply = "这条 Telegram 消息看起来不像岗位输入。请直接发 JD 正文、岗位链接，或“岗位链接 + JD 正文”。"
             if not args.dry_run:
                 telegram.send_message(reply, chat_id=message.chat_id)
-            print(reply)
+            logger.warning(
+                format_kv(
+                    "telegram.poll.invalid_input",
+                    update_id=message.update_id,
+                    chat_id=message.chat_id,
+                    message_id=message.message_id,
+                )
+            )
             state["last_update_id"] = message.update_id
             _save_state(state_path, state)
             continue
 
+        notion_started = None
         capture_bundle = build_manual_capture_bundle(
             repo_root=ROOT,
             request=request,
@@ -90,6 +134,7 @@ def main() -> None:
 
         notion_url = "dry-run://notion"
         if notion is not None:
+            notion_started = time.monotonic()
             page = notion.create_analysis_page(
                 title=notion_fields["title"],
                 company_name=notion_fields["company_name"],
@@ -111,6 +156,15 @@ def main() -> None:
                 company_profile_markdown=notion_fields["company_profile_markdown"],
             )
             notion_url = page.page_url
+            logger.info(
+                format_kv(
+                    "notion.write.done",
+                    update_id=message.update_id,
+                    page_id=page.page_id,
+                    page_url=page.page_url,
+                    duration_ms=int((time.monotonic() - notion_started) * 1000),
+                )
+            )
 
         reply = build_telegram_short_message(
             analysis_payload=analysis.payload,
@@ -121,7 +175,24 @@ def main() -> None:
         )
         if not args.dry_run:
             telegram.send_message(reply, chat_id=message.chat_id)
-        print(reply)
+            logger.info(
+                format_kv(
+                    "telegram.reply.sent",
+                    update_id=message.update_id,
+                    chat_id=message.chat_id,
+                    notion_url=notion_url,
+                    reply_chars=len(reply),
+                )
+            )
+        logger.info(
+            format_kv(
+                "telegram.poll.done",
+                update_id=message.update_id,
+                input_kind="job_url" if request.job_url and not request.jd_text else "job_url_and_jd_text" if request.job_url and request.jd_text else "jd_text",
+                bundle_dir=capture_bundle.bundle_dir,
+                duration_ms=int((time.monotonic() - message_started) * 1000),
+            )
+        )
         state["last_update_id"] = message.update_id
         _save_state(state_path, state)
 

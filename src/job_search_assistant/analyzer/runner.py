@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from job_search_assistant.runtime import format_kv, get_logger
 
 from .job_packet import JobPacket, build_job_packet
 from .profile_loader import load_profile_stack
 from .providers import CodexExecProvider, MockProvider, OpenAIResponsesProvider, ProviderRequest, codex_cli_is_ready
 from .renderer import render_markdown
 from .schema import REPORT_JSON_SCHEMA, validate_report_shape
+
+logger = get_logger("analyzer.runner")
 
 
 @dataclass
@@ -37,6 +42,7 @@ def run_analysis(
     company_profile_payload: dict[str, Any] | None = None,
     bundle_manifest: dict[str, Any] | None = None,
 ) -> RunResult:
+    started = time.monotonic()
     loaded_profile = load_profile_stack(repo_root, profile_stack_path, extra_profile_fragments)
     packet = build_job_packet(
         jd_text=jd_text,
@@ -52,6 +58,17 @@ def run_analysis(
     user_text = _build_user_text(packet, loaded_profile.fragments)
 
     provider = _select_provider(provider_name)
+    logger.info(
+        format_kv(
+            "analysis.start",
+            provider=provider.__class__.__name__,
+            model=model,
+            analysis_mode=analysis_mode,
+            company=company_name,
+            job_url=job_url,
+            web_search_enabled=enable_web_search,
+        )
+    )
     response = provider.run(
         ProviderRequest(
             repo_root=repo_root,
@@ -79,6 +96,20 @@ def run_analysis(
         **response,
     }
     markdown = render_markdown(payload)
+    duration_ms = int((time.monotonic() - started) * 1000)
+    report = payload["report"]
+    verdict = report["executive_verdict"]
+    logger.info(
+        format_kv(
+            "analysis.done",
+            provider=provider.__class__.__name__,
+            model=model,
+            analysis_mode=analysis_mode,
+            decision=verdict.get("funnel_category"),
+            company=company_name or packet.company_name,
+            duration_ms=duration_ms,
+        )
+    )
     return RunResult(payload=payload, markdown=markdown)
 
 

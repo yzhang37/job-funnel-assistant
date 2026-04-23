@@ -4,8 +4,11 @@ import json
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
+
+from job_search_assistant.runtime import format_kv, get_logger
 
 
 LIVE_CAPTURE_SCHEMA: dict[str, Any] = {
@@ -109,6 +112,8 @@ LIVE_CAPTURE_SCHEMA: dict[str, Any] = {
     "required": ["job_posting", "company_profile"],
 }
 
+logger = get_logger("capture.live")
+
 
 def codex_live_capture_job_url(
     *,
@@ -116,16 +121,27 @@ def codex_live_capture_job_url(
     model: str = "gpt-5.4",
     max_attempts: int = 2,
 ) -> dict[str, Any]:
+    logger.info(format_kv("capture.live.requested", job_url=job_url, model=model, max_attempts=max_attempts))
     codex_bin = shutil.which("codex")
     if not codex_bin:
+        logger.error(format_kv("capture.live.codex_missing", job_url=job_url))
         raise RuntimeError("codex CLI is not installed or not on PATH.")
 
     last_error: RuntimeError | None = None
     for attempt in range(1, max_attempts + 1):
         try:
+            logger.info(format_kv("capture.live.attempt.start", job_url=job_url, attempt=attempt, codex_bin=codex_bin))
             return _run_codex_capture_once(codex_bin=codex_bin, job_url=job_url, model=model)
         except RuntimeError as exc:
             last_error = exc
+            logger.warning(
+                format_kv(
+                    "capture.live.attempt.failed",
+                    job_url=job_url,
+                    attempt=attempt,
+                    error=str(exc),
+                )
+            )
             if attempt >= max_attempts:
                 break
     assert last_error is not None
@@ -133,6 +149,7 @@ def codex_live_capture_job_url(
 
 
 def _run_codex_capture_once(*, codex_bin: str, job_url: str, model: str) -> dict[str, Any]:
+    started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="codex-capture-") as temp_dir:
         temp_root = Path(temp_dir)
         schema_path = temp_root / "output_schema.json"
@@ -177,9 +194,22 @@ def _run_codex_capture_once(*, codex_bin: str, job_url: str, model: str) -> dict
             raise RuntimeError("codex live capture finished without writing the last-message file.")
         raw = output_path.read_text(encoding="utf-8").strip()
         try:
-            return json.loads(raw)
+            payload = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise ValueError(f"Codex live capture returned non-JSON output: {raw}") from exc
+    duration_ms = int((time.monotonic() - started) * 1000)
+    job_posting = payload.get("job_posting") or {}
+    company_profile = payload.get("company_profile") or {}
+    logger.info(
+        format_kv(
+            "capture.live.done",
+            job_url=job_url,
+            title=job_posting.get("title"),
+            company=job_posting.get("company") or company_profile.get("company_name"),
+            duration_ms=duration_ms,
+        )
+    )
+    return payload
 
 
 def _build_capture_prompt(job_url: str) -> str:

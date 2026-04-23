@@ -221,6 +221,8 @@ python3 scripts/process_telegram_manual_intake.py --provider auto
 python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full
 ```
 
+当前安装脚本会把执行环境的 `PATH` 一并写进 `launchd` plist，确保后台任务能找到本机 `codex` CLI 与 Anaconda Python。
+
 当前 Telegram manual intake 的限制：
 
 - 支持 `JD 文本`
@@ -228,6 +230,33 @@ python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto -
 - 支持 `纯岗位链接`
 - `纯岗位链接` 会在 `Capture` 节点里触发本机 `Codex + Computer Use` 的 live browser capture，然后产出标准 bundle 继续交给 `Analyzer`
 - 只处理配置好的 owner 消息：优先读取 `TELEGRAM_USER_ID`；如果没配，则退回到私聊场景下用 `TELEGRAM_CHAT_ID` 限制 chat；bot 自己的回复消息不会进入 intake
+
+## 日志格式
+
+当前核心服务链路统一使用单行文本日志，格式为：
+
+```text
+<UTC ISO8601> [<Seattle local time>] <LEVEL> <logger_name> event=<event_name> key=value ...
+```
+
+例如：
+
+```text
+2026-04-23T03:15:52Z [2026-04-22 20:15:52 PDT] INFO telegram.manual_intake event=telegram.poll.accepted update_id=461747920 chat_id=8285341224
+```
+
+约定：
+
+- 第一段固定使用格林威治时间（UTC / `Z`）时间戳
+- 方括号里固定使用西雅图本地可读时间（`PDT` / `PST`）
+- 级别固定为 `DEBUG` / `INFO` / `WARN` / `ERROR`
+- 后续字段尽量使用 `event=... key=value` 形式，方便未来接入 CloudWatch 或其他日志系统
+- 用户可读长正文（例如整段 Telegram 回复）不应直接打进服务日志
+
+当前主要日志文件：
+
+- `/Users/l/Projects/找工作/data/logs/telegram_manual_intake.out.log`
+- `/Users/l/Projects/找工作/data/logs/telegram_manual_intake.err.log`
 
 TODO:
 

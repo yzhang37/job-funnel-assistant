@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 
@@ -19,7 +20,10 @@ from job_search_assistant.manual_flow import (
     parse_manual_intake_text,
     run_analysis_for_capture_bundle,
 )
-from job_search_assistant.runtime import load_local_env
+from job_search_assistant.runtime import configure_logging, format_kv, get_logger, load_local_env
+
+
+logger = get_logger("manual_intake.once")
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,9 +45,24 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    configure_logging(force=True)
     load_local_env(ROOT)
+    started = time.monotonic()
     raw_text = args.text or Path(args.text_file).read_text(encoding="utf-8")
     request = parse_manual_intake_text(raw_text, source_channel=args.source_channel)
+    logger.info(
+        format_kv(
+            "manual_intake.once.start",
+            source_channel=args.source_channel,
+            input_kind="job_url" if request.job_url and not request.jd_text else "job_url_and_jd_text" if request.job_url and request.jd_text else "jd_text",
+            job_url=request.job_url,
+            provider=args.provider,
+            model=args.model,
+            analysis_mode=args.analysis_mode,
+            write_notion=args.write_notion,
+            send_telegram=args.send_telegram,
+        )
+    )
     capture_bundle = build_manual_capture_bundle(
         repo_root=ROOT,
         request=request,
@@ -68,6 +87,7 @@ def main() -> None:
     notion_url = "local-only://analysis-report"
     if args.write_notion:
         notion = NotionAnalysisReportClient()
+        notion_started = time.monotonic()
         page = notion.create_analysis_page(
             title=notion_fields["title"],
             company_name=notion_fields["company_name"],
@@ -89,7 +109,14 @@ def main() -> None:
             company_profile_markdown=notion_fields["company_profile_markdown"],
         )
         notion_url = page.page_url
-        print(f"Notion: {notion_url}")
+        logger.info(
+            format_kv(
+                "notion.write.done",
+                page_id=page.page_id,
+                page_url=page.page_url,
+                duration_ms=int((time.monotonic() - notion_started) * 1000),
+            )
+        )
     reply = build_telegram_short_message(
         analysis_payload=analysis.payload,
         notion_url=notion_url,
@@ -100,7 +127,15 @@ def main() -> None:
     if args.send_telegram:
         telegram = TelegramBotClient()
         telegram.send_message(reply)
-    print(reply)
+        logger.info(format_kv("telegram.reply.sent", reply_chars=len(reply), notion_url=notion_url))
+    logger.info(
+        format_kv(
+            "manual_intake.once.done",
+            bundle_dir=capture_bundle.bundle_dir,
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+    )
+    logger.info(format_kv("manual_intake.once.reply", reply_preview=reply[:240]))
 
 
 if __name__ == "__main__":

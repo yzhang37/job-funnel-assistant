@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import asdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,9 +22,11 @@ from job_search_assistant.capture import (
     render_company_profile_markdown,
     render_jd_markdown,
 )
+from job_search_assistant.runtime import format_kv, get_logger
 
 
 URL_PATTERN = re.compile(r"https?://\S+")
+logger = get_logger("manual_flow")
 
 
 @dataclass
@@ -99,6 +102,17 @@ def build_manual_capture_bundle(
     output_root: Path,
     model: str = "gpt-5.4",
 ) -> CaptureBundleResult:
+    started = time.monotonic()
+    input_kind = "job_url" if request.job_url and not request.jd_text else "job_url_and_jd_text" if request.job_url and request.jd_text else "jd_text"
+    logger.info(
+        format_kv(
+            "capture.bundle.start",
+            source_channel=request.source_channel,
+            input_kind=input_kind,
+            job_url=request.job_url,
+            model=model,
+        )
+    )
     if request.jd_text:
         title = infer_title(request.jd_text) or _infer_title_from_url(request.job_url) or "未命名岗位"
         company_name = request.company_name or infer_company_name(request.jd_text)
@@ -181,6 +195,17 @@ def build_manual_capture_bundle(
         notes=[f"source_channel={request.source_channel}"],
     )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    duration_ms = int((time.monotonic() - started) * 1000)
+    logger.info(
+        format_kv(
+            "capture.bundle.done",
+            bundle_dir=bundle_dir,
+            company=posting.company,
+            title=posting.title,
+            source_platform=posting.source_platform,
+            duration_ms=duration_ms,
+        )
+    )
     return CaptureBundleResult(
         bundle_dir=bundle_dir,
         manifest=manifest,
@@ -202,6 +227,7 @@ def run_analysis_for_capture_bundle(
     analysis_mode: str = "full",
     enable_web_search: bool = False,
 ) -> RunResult:
+    started = time.monotonic()
     resolved_jd_text = request.jd_text or capture_bundle.jd_markdown
     resolved_company_name = (
         request.company_name
@@ -226,6 +252,18 @@ def run_analysis_for_capture_bundle(
         result,
         capture_bundle.bundle_dir / "analysis_report.md",
         capture_bundle.bundle_dir / "analysis_report.json",
+    )
+    report = result.payload["report"]
+    verdict = report["executive_verdict"]
+    duration_ms = int((time.monotonic() - started) * 1000)
+    logger.info(
+        format_kv(
+            "analysis.bundle.done",
+            bundle_dir=capture_bundle.bundle_dir,
+            decision=verdict.get("funnel_category"),
+            company=resolved_company_name,
+            duration_ms=duration_ms,
+        )
     )
     return result
 
