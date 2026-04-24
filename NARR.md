@@ -824,3 +824,350 @@ Provider 选择顺序：
 - **7 部件运行时已经落地**
 - **核心异步链路已经可跑**
 - **但离彻底收口、完全多机化、彻底去遗留路径，还有持续工程化工作要做**
+
+## 11. 2026-04-23 需求补充稿：配置系统与 Tracker 调度控制
+
+本节是新的**正式需求补充稿**。  
+它定义的是后续实现必须收口到的目标运行模型，而不是“当前已经全部实现”的事实状态。
+
+### 11.1 配置系统总体目标
+
+系统配置必须从“单机固定本地文件”演进为：
+
+- 支持多节点部署
+- 支持组件级独立配置
+- 支持本地模板初始化
+- 支持未来迁移到集中参数中心
+- 支持缺失配置自动补齐
+- 支持敏感配置 fail-fast
+
+### 11.2 配置文件追踪策略
+
+仓库中不应追踪真实运行配置文件。  
+仓库中应只追踪**配置模板**。
+
+目标原则：
+
+- `config/*.toml`：真实实例配置，**不追踪**
+- `templates/config/*.toml`：模板基线，**追踪**
+
+也就是说：
+
+- 仓库保留“模板”
+- 每台机器保留自己的“实例”
+
+### 11.3 配置初始化原则
+
+系统启动时必须支持自动初始化缺失配置。
+
+初始化规则：
+
+- 如果目标配置文件不存在，则从对应 template 复制生成
+- 如果目标配置文件已存在，则**绝不覆盖**
+- 采用“**默认存在就不复制**”原则
+
+该行为适用于：
+
+- 本地单机首次启动
+- 新节点首次部署
+- 新组件首次启用
+
+### 11.4 配置必须按组件命名空间拆分
+
+不同组件不应强制依赖一整套统一本地配置文件。
+
+目标是：
+
+- `Tracker` 只需要 `Tracker` 自己的配置
+- `Manual Intake` 只需要 `Manual Intake` 自己的配置
+- `Capture` 只需要 `Capture` 和本机 browser broker 相关配置
+- `Analyzer` 只需要 `Analyzer` 自己的配置
+- `Output` 只需要 `Output` 自己的配置
+- `MySQL` 和 `Kafka` 也可以有各自独立配置
+
+因此：
+
+- 配置必须按组件 namespace 拆分
+- 初始化也必须按组件进行
+- 不应再假设任何一台机器都必须持有整套系统全部配置
+
+### 11.5 配置来源必须可插拔
+
+配置系统必须支持 provider abstraction。
+
+预期支持的来源：
+
+- 本地实例文件
+- 环境变量
+- 远端参数存储
+
+未来重点兼容：
+
+- AWS Systems Manager Parameter Store
+
+### 11.6 配置解析顺序
+
+配置系统应支持明确的多来源解析顺序。
+
+推荐顺序：
+
+1. Environment
+2. Remote Parameter Store
+3. Local instance config
+4. Template defaults
+
+模板的定位应当是：
+
+- baseline
+- bootstrap source
+- 最后兜底
+
+而不是长期运行时的唯一 source of truth。
+
+### 11.7 敏感配置处理
+
+对结构性配置，可以自动初始化默认值。  
+对敏感配置，不应假装“自动可用”。
+
+正确行为应为：
+
+- 可以初始化 placeholder
+- 若仍缺少真实值，则启动时 fail-fast
+- 必须给出明确 remediation
+
+### 11.8 Tracker 的用户级调度语义
+
+Tracker 的“多久跑一次”应使用固定 calendar 枚举，而不是自由 interval 文本。
+
+当前要求支持：
+
+- `daily`
+- `weekly`
+- `biweekly`
+- `monthly`
+- `bimonthly`
+- `quarterly`
+
+更长周期当前不需要。
+
+### 11.9 Tracker 调度的时间语义
+
+上述调度频率必须按自然周期解释，而不是“上次成功后滚动若干天”。
+
+定义如下：
+
+- `daily`：自然日最多一次
+- `weekly`：自然周最多一次
+- `biweekly`：两个自然周最多一次
+- `monthly`：自然月最多一次
+- `bimonthly`：两个月最多一次
+- `quarterly`：自然季度最多一次
+
+### 11.10 Tracker 调度时区
+
+自然周期判断必须绑定明确业务时区。
+
+默认时区：
+
+- `America/Los_Angeles`
+
+这意味着：
+
+- 每日边界
+- 每周边界
+- 每月边界
+- 每季度边界
+
+都应按西雅图时间解释，而不是按节点机器本地时区漂移。
+
+### 11.11 interval 的角色调整
+
+`interval` 不应继续作为 Tracker 用户级调度配置。
+
+`interval` 应保留给系统内部运行控制使用，例如：
+
+- failure backoff
+- cooldown
+- lease TTL
+- stale task expiry
+
+也就是说：
+
+- 用户看到的是 calendar frequency
+- 系统内部才使用 interval 语义
+
+### 11.12 Tracker 过载控制目标
+
+Tracker 调度必须支持 backlog 控制，不能无限堆积。
+
+系统必须支持：
+
+- due 不等于自动入队
+- admission control
+- pending hard cap
+- stale task expiry
+- tracker-generated workload budget
+
+### 11.13 due 与 admission 的区分
+
+某个 tracker “到期”只表示：
+
+- 它具备进入调度候选集的资格
+
+并不表示：
+
+- 它必须立刻生成 discovery request
+
+真正是否入队，应由 admission control 决定。
+
+### 11.14 Admission Control
+
+系统必须能够限制：
+
+- 每轮最多 admit 多少个 tracker discovery
+- 最大 pending discovery 数量
+- 最大 tracker-generated capture request 数量
+- 每日/每周期允许消耗的 browser budget
+
+### 11.15 Coalesce 规则
+
+对于同一个 tracker：
+
+- 如果已经存在 pending 或 running 的 discovery request
+- 则不应继续无限生成新的同类 request
+
+目标语义：
+
+- 同一个 tracker 在系统中最多只有一个有效 discovery request
+
+### 11.16 Stale / TTL / Expiry
+
+对于 tracker 生成的 discovery 和 downstream capture 任务，系统必须支持：
+
+- TTL
+- 过期淘汰
+- stale 清理
+
+否则在 backlog 爆炸时，系统会永久处理早已失去价值的旧任务。
+
+### 11.17 公平性与防饿死
+
+系统必须防止 tracker starvation。
+
+不允许出现：
+
+- A / B / C 长期反复被 admission
+- D / E / F 长期得不到运行机会
+
+调度排序应考虑：
+
+- 是否已有 pending task
+- lateness / 拖欠程度
+- 最近一次 admitted 的时间
+- failure/backoff 状态
+
+### 11.18 失败后的 backoff
+
+失败的 tracker 不应每轮都重新 due 并反复抢资源。
+
+必须支持：
+
+- failure backoff
+- cooldown
+- next eligible time
+
+必要时应支持：
+
+- 连续失败阈值后的自动暂停
+
+### 11.19 Tracker Worker 优雅宕机
+
+Tracker Worker 必须支持优雅宕机能力。
+
+这里的正确目标不是：
+
+- 清空全局队列
+- 清空组件 backlog
+- 停止整个 Tracker 系统
+
+而是：
+
+- **只完成当前 worker 手上的当前任务**
+- 完成后立即退出
+- 不再接任何新任务
+
+### 11.20 优雅宕机语义：仅支持 drain-current
+
+对于 Tracker Worker，正确的 graceful shutdown 语义应为：
+
+- `drain-current`
+
+其定义是：
+
+- 若当前没有 in-flight task，则直接退出
+- 若当前有且仅有一条 in-flight discovery task，则跑完该条任务后退出
+- 退出前允许：
+  - 正常写 `tracker_runs`
+  - 正常写 `tracker.links.discovered`
+  - 正常生成 `capture.requested`
+  - 正常 commit 当前消息
+- 之后绝不再 poll 下一条任务
+
+### 11.21 明确反对 drain-queue / drain-global
+
+对于多 worker、多节点的 Tracker 体系：
+
+- `drain-queue` 是不正确的
+- `drain-global` 也是不正确的
+
+原因：
+
+- 某个 worker 要退出，不代表别的 worker 不能继续消费
+- 某个 worker 退出时，不应试图清空全局 backlog
+- 队列可能很大，`drain-queue` 会导致该 worker 永远停不下来
+
+### 11.22 优雅宕机必须是 worker-scoped
+
+Tracker graceful shutdown 的控制粒度必须是：
+
+- **单个 worker 实例**
+
+不能只按：
+
+- `component = tracker`
+
+来做粗粒度停机。
+
+未来控制模型至少应能区分：
+
+- `component`
+- `node_id`
+- `worker_id`
+
+### 11.23 其他 worker 应继续正常工作
+
+当某个 Tracker Worker 进入 `drain-current` 后：
+
+- 该 worker 跑完当前任务即退出
+- 同节点其他 worker 仍可继续运行
+- 其他机器上的 worker 仍可继续运行
+- Kafka backlog 继续保留，由其他 worker 消费
+
+这是一种：
+
+- worker-scoped
+- non-global
+- non-destructive
+
+的优雅停机语义。
+
+### 11.24 当前新增需求的总体目标
+
+本节新增需求的总体方向是：
+
+- 让配置系统从“单机文件”演进成“分层、按组件、可迁移、可远端化”的配置体系
+- 让 Tracker 调度从“到期即入队”演进成“按自然周期、可背压、可公平、可优雅停机”的正式调度体系
+
+如果压成一句话：
+
+当前新增需求的核心，是把系统继续从“本地脚本式可运行”推进到“多节点、低耦合、可控调度、可长期运维”的运行时。  
