@@ -7,6 +7,8 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+from job_search_assistant.runtime.config_files import ensure_config_file
+
 
 DURATION_PATTERN = re.compile(r"(?P<value>\d+)(?P<unit>[smhdw])")
 
@@ -43,6 +45,12 @@ class CachePolicyRegistry:
     @classmethod
     def from_file(cls, path: str | Path) -> "CachePolicyRegistry":
         config_path = Path(path)
+        if not config_path.exists():
+            repo_root = Path(__file__).resolve().parents[3]
+            try:
+                config_path = ensure_config_file(repo_root, config_path)
+            except FileNotFoundError:
+                pass
         with config_path.open("rb") as fh:
             return cls(tomllib.load(fh))
 
@@ -148,4 +156,3 @@ def parse_duration(raw: str) -> timedelta:
     if position != len(text):
         raise ValueError(f"Unsupported duration format: {raw!r}")
     return timedelta(seconds=total_seconds)
-

@@ -10,6 +10,8 @@ from typing import Any
 
 import requests
 
+from job_search_assistant.runtime.config_files import ensure_config_file
+
 
 NOTION_API_BASE = "https://api.notion.com/v1"
 NOTION_VERSION = "2025-09-03"
@@ -406,8 +408,9 @@ def _normalize_code_language(language: str) -> str:
 @lru_cache(maxsize=1)
 def _load_notion_settings() -> dict[str, int]:
     repo_root = Path(__file__).resolve().parents[3]
-    config_path = repo_root / "config" / "integrations.toml"
-    if not config_path.exists():
+    try:
+        config_path = ensure_config_file(repo_root, "config/integrations.toml")
+    except FileNotFoundError:
         return {"max_children_per_request": DEFAULT_MAX_CHILDREN_PER_REQUEST}
     payload = tomllib.loads(config_path.read_text(encoding="utf-8"))
     notion = payload.get("notion", {})

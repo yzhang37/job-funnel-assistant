@@ -41,6 +41,13 @@ poll_interval_seconds = 30
 consumer_group = "job-funnel-tracker"
 model = "gpt-5.4"
 tracker_store_driver = "mysql"
+worker_id = "default"
+schedule_timezone = "America/Los_Angeles"
+failure_retry_cooldown_minutes = 60
+max_admissions_per_cycle = 5
+max_pending_discovery_requests = 20
+discovery_request_ttl_hours = 24
+max_capture_requests_per_tracker_run = 30
 
 [services.manual_intake]
 poll_interval_seconds = 30

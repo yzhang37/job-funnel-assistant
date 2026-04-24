@@ -76,9 +76,19 @@ def main() -> None:
         )
 
     runtime = bootstrap_runtime(ROOT, force_logging=False)
+    tracker_worker_id = "default"
     try:
         ensure_runtime_ready(runtime)
+        tracker_worker_id = str(runtime.settings.tracker.extras.get("worker_id", "default"))
         migrated_offset = _migrate_legacy_offset(runtime, ROOT / args.legacy_state_file)
+        runtime.runtime_store.set_worker_control(
+            component_name="tracker",
+            node_id=runtime.settings.browser_broker.node_id,
+            worker_id=tracker_worker_id,
+            desired_state="running",
+            shutdown_mode=None,
+            reason="runtime launch-agent install",
+        )
         if not args.skip_browser_preflight:
             preflight_model = args.browser_preflight_model or str(runtime.settings.capture.extras.get("model", "gpt-5.4"))
             runtime.browser_broker.preflight(model=preflight_model)
@@ -115,7 +125,12 @@ def main() -> None:
         RuntimeLaunchService(
             name="tracker",
             script="run_tracker_service.py",
-            extra_args=["--config", "config/trackers.toml"],
+            extra_args=[
+                "--config",
+                "config/trackers.toml",
+                "--worker-id",
+                tracker_worker_id,
+            ],
         ),
     ]
 

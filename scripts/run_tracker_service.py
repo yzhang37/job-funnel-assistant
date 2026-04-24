@@ -20,6 +20,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the Tracker worker.")
     parser.add_argument("--once", action="store_true", help="Schedule due trackers and consume at most one discovery request.")
     parser.add_argument("--config", default="config/trackers.toml", help="Tracker config file.")
+    parser.add_argument(
+        "--worker-id",
+        default="default",
+        help="Worker-scoped identity used for drain-current controls.",
+    )
     return parser.parse_args()
 
 
@@ -36,6 +41,7 @@ def main() -> None:
             runtime_store=runtime.runtime_store,
             tracker_config=tracker_config,
             browser_broker=runtime.browser_broker,
+            worker_id=args.worker_id,
         )
         if args.once:
             service.run_once()

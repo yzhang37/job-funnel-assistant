@@ -19,3 +19,4 @@ data/raw/manual_intake/
 data/logs/
 data/processed/telegram_manual_state.json
 workspace.code-workspace
+config/*.toml

@@ -135,6 +135,38 @@ class MySQLRuntimeStore:
             )
             """,
             """
+            CREATE TABLE IF NOT EXISTS tracker_discovery_requests (
+              request_id VARCHAR(64) PRIMARY KEY,
+              tracker_id VARCHAR(255) NOT NULL,
+              status VARCHAR(32) NOT NULL,
+              priority INT NOT NULL DEFAULT 100,
+              due_reason VARCHAR(255) NOT NULL,
+              admitted_at VARCHAR(32) NOT NULL,
+              started_at VARCHAR(32) NULL,
+              finished_at VARCHAR(32) NULL,
+              stale_after VARCHAR(32) NOT NULL,
+              payload_json LONGTEXT NOT NULL,
+              last_error LONGTEXT NULL,
+              created_at VARCHAR(32) NOT NULL,
+              updated_at VARCHAR(32) NOT NULL,
+              INDEX tracker_status_idx (tracker_id, status),
+              INDEX status_stale_idx (status, stale_after),
+              INDEX admitted_idx (admitted_at)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS runtime_worker_controls (
+              component_name VARCHAR(64) NOT NULL,
+              node_id VARCHAR(255) NOT NULL,
+              worker_id VARCHAR(255) NOT NULL,
+              desired_state VARCHAR(32) NOT NULL,
+              shutdown_mode VARCHAR(32) NULL,
+              reason TEXT NULL,
+              updated_at VARCHAR(32) NOT NULL,
+              PRIMARY KEY (component_name, node_id, worker_id)
+            )
+            """,
+            """
             CREATE TABLE IF NOT EXISTS discovered_jobs (
               job_url_hash CHAR(64) PRIMARY KEY,
               job_url TEXT NOT NULL,
@@ -607,6 +639,216 @@ class MySQLRuntimeStore:
 
     def release_browser_lease(self, *, lane_key: str, holder_id: str) -> None:
         self.release_runtime_lease(lane_key=lane_key, holder_id=holder_id)
+
+    def cleanup_stale_tracker_discovery_requests(self, *, now: datetime | None = None) -> int:
+        now_text = _to_text(now or datetime.now(UTC))
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE tracker_discovery_requests
+                SET status = 'expired',
+                    finished_at = COALESCE(finished_at, %s),
+                    last_error = COALESCE(last_error, 'stale request expired'),
+                    updated_at = %s
+                WHERE status IN ('queued', 'running')
+                  AND stale_after <= %s
+                """,
+                (now_text, now_text, now_text),
+            )
+            affected = int(cursor.rowcount or 0)
+            cursor.close()
+        return affected
+
+    def count_tracker_discovery_requests(self, *, statuses: tuple[str, ...] = ("queued", "running")) -> int:
+        if not statuses:
+            return 0
+        placeholders = ", ".join("%s" for _ in statuses)
+        with self.connect() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT COUNT(*) AS count FROM tracker_discovery_requests WHERE status IN ({placeholders})",
+                statuses,
+            )
+            row = cursor.fetchone()
+            cursor.close()
+        return int(row["count"]) if row else 0
+
+    def get_active_tracker_discovery_tracker_ids(self) -> set[str]:
+        with self.connect() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                """
+                SELECT DISTINCT tracker_id
+                FROM tracker_discovery_requests
+                WHERE status IN ('queued', 'running')
+                """
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+        return {str(row["tracker_id"]) for row in rows}
+
+    def get_tracker_last_admitted_at(self) -> dict[str, datetime]:
+        with self.connect() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                """
+                SELECT tracker_id, MAX(admitted_at) AS admitted_at
+                FROM tracker_discovery_requests
+                GROUP BY tracker_id
+                """
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+        return {
+            str(row["tracker_id"]): _from_text(str(row["admitted_at"]))
+            for row in rows
+            if row["admitted_at"] is not None
+        }
+
+    def record_tracker_discovery_request(
+        self,
+        *,
+        request_id: str,
+        tracker_id: str,
+        status: str,
+        priority: int,
+        due_reason: str,
+        admitted_at: datetime,
+        stale_after: datetime,
+        payload: dict[str, Any],
+    ) -> None:
+        now_text = _to_text(datetime.now(UTC))
+        admitted_text = _to_text(admitted_at)
+        stale_text = _to_text(stale_after)
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO tracker_discovery_requests (
+                  request_id, tracker_id, status, priority, due_reason,
+                  admitted_at, stale_after, payload_json, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                  status = VALUES(status),
+                  priority = VALUES(priority),
+                  due_reason = VALUES(due_reason),
+                  stale_after = VALUES(stale_after),
+                  payload_json = VALUES(payload_json),
+                  updated_at = VALUES(updated_at)
+                """,
+                (
+                    request_id,
+                    tracker_id,
+                    status,
+                    priority,
+                    due_reason,
+                    admitted_text,
+                    stale_text,
+                    json.dumps(payload, ensure_ascii=False),
+                    now_text,
+                    now_text,
+                ),
+            )
+            cursor.close()
+
+    def mark_tracker_discovery_request_running(
+        self,
+        *,
+        request_id: str,
+        started_at: datetime | None = None,
+    ) -> None:
+        started_text = _to_text(started_at or datetime.now(UTC))
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE tracker_discovery_requests
+                SET status = 'running',
+                    started_at = COALESCE(started_at, %s),
+                    updated_at = %s
+                WHERE request_id = %s
+                """,
+                (started_text, started_text, request_id),
+            )
+            cursor.close()
+
+    def mark_tracker_discovery_request_finished(
+        self,
+        *,
+        request_id: str,
+        status: str,
+        finished_at: datetime | None = None,
+        last_error: str | None = None,
+    ) -> None:
+        finished_text = _to_text(finished_at or datetime.now(UTC))
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE tracker_discovery_requests
+                SET status = %s,
+                    finished_at = %s,
+                    last_error = %s,
+                    updated_at = %s
+                WHERE request_id = %s
+                """,
+                (status, finished_text, last_error, finished_text, request_id),
+            )
+            cursor.close()
+
+    def set_worker_control(
+        self,
+        *,
+        component_name: str,
+        node_id: str,
+        worker_id: str,
+        desired_state: str,
+        shutdown_mode: str | None = None,
+        reason: str | None = None,
+    ) -> None:
+        now_text = _to_text(datetime.now(UTC))
+        with self.connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO runtime_worker_controls (
+                  component_name, node_id, worker_id, desired_state,
+                  shutdown_mode, reason, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                  desired_state = VALUES(desired_state),
+                  shutdown_mode = VALUES(shutdown_mode),
+                  reason = VALUES(reason),
+                  updated_at = VALUES(updated_at)
+                """,
+                (component_name, node_id, worker_id, desired_state, shutdown_mode, reason, now_text),
+            )
+            cursor.close()
+
+    def get_worker_control(
+        self,
+        *,
+        component_name: str,
+        node_id: str,
+        worker_id: str,
+    ) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                """
+                SELECT component_name, node_id, worker_id, desired_state,
+                       shutdown_mode, reason, updated_at
+                FROM runtime_worker_controls
+                WHERE component_name = %s
+                  AND node_id = %s
+                  AND worker_id = %s
+                """,
+                (component_name, node_id, worker_id),
+            )
+            row = cursor.fetchone()
+            cursor.close()
+        return dict(row) if row else None
 
 
 def _to_text(value: datetime) -> str:

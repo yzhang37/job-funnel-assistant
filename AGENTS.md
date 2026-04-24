@@ -16,7 +16,8 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 
 - `README.md`: human-readable overview and setup notes
 - `PLANS.md`: active roadmap and phased execution plan
-- `config/`: runtime configuration such as cache policy and future pipeline settings
+- `config/`: local runtime configuration copied from templates; do not track machine-specific `.toml` files
+- `config_templates/`: tracked default config templates used for first-run local initialization
 - `templates/`: reusable prompt, analysis, and resume templates
 - `scripts/`: lightweight utility scripts and automation entrypoints
 - `src/`: application code
@@ -48,8 +49,11 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Keep cache policy configuration-driven. TTL and freshness rules should live in config files rather than being hardcoded in Python when practical.
 - Treat job trackers as the first discovery layer. The scheduler should only discover new job links from configured tracker URLs; it must not perform fit analysis or ranking.
 - Keep tracker configuration minimal and config-driven. Stable fields currently expected are `id`, `label`, `url`, `source_frequency`, `target_new_jobs`, and `enabled`.
+- Tracker `source_frequency` uses calendar buckets, not rolling intervals. Supported values are `daily`, `weekly`, `biweekly`, `monthly`, `bimonthly`, and `quarterly`; default scheduling timezone is `America/Los_Angeles`.
 - `target_new_jobs` means "keep paging internally until this many previously unseen job links are found, or the source is exhausted." Pagination is an implementation detail, not a user-facing config field.
-- State storage for tracker scheduling should remain driver-abstracted. SQLite is the first implementation, but the service boundary should stay portable to MySQL/Aurora later.
+- State storage for tracker scheduling should remain driver-abstracted. The active queue-driven runtime uses MySQL; SQLite is retained only for legacy/local utility paths.
+- Tracker runtime admission must coalesce active requests for the same tracker, apply backlog caps, expire stale active discovery requests, and prefer trackers that have never or least recently been admitted to avoid starvation.
+- Tracker Worker shutdown is worker-scoped and only supports `drain-current`: finish the current in-flight discovery message, then stop accepting new work. Do not implement `drain-queue` or global queue draining.
 - Treat scheduler discovery as platform-adapter driven. LinkedIn and Indeed are the first supported search-result sources; future sites should plug in through the same canonical JD-link boundary.
 - For LinkedIn tracker discovery, treat the canonical output as JD links only. Current validated path is: click a result card -> read `currentJobId` from the search-results URL -> normalize to `https://www.linkedin.com/jobs/view/<job_id>/`.
 - For Indeed tracker discovery, treat the canonical output as JD links only. Current validated path is: click a result card -> read `vjk`/`jk` from the search/search-result URL -> normalize to `https://www.indeed.com/viewjob?jk=<id>`.
@@ -104,6 +108,8 @@ Common expected commands once implemented:
 - process Telegram manual-intake updates: `python3 scripts/process_telegram_manual_intake.py --provider auto`
 - install Telegram manual-intake launch agent: `python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full`
 - install queue-driven runtime launch agents and cut over from legacy Telegram intake: `./.venv/bin/python scripts/install_runtime_launch_agents.py`
+- initialize missing local config files from tracked templates: `./.venv/bin/python scripts/init_local_config.py`
+- set tracker worker control state: `./.venv/bin/python scripts/control_tracker_service.py --state <running|drain-current|stopped> --worker-id default`
 - run browser node preflight once (or re-run with `--force` after permissions change): `./.venv/bin/python scripts/run_browser_preflight.py --force`
 - uninstall queue-driven runtime launch agents: `./.venv/bin/python scripts/uninstall_runtime_launch_agents.py`
 - send one Telegram message from `.env.local`: `python3 scripts/send_telegram_message.py --text "hello"`

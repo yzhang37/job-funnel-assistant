@@ -1,17 +1,26 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from .browser import BrowserDiscoverySession
-from .frequency import resolve_frequency_interval
+from .frequency import DEFAULT_TRACKER_TIMEZONE, normalize_source_frequency, tracker_period_key
 from .models import DueTracker, TrackerConfig, TrackerDiscoverySummary, TrackerRunState
 from .storage.base import TrackerStateStore
 
 
 class TrackerScheduler:
-    def __init__(self, config: TrackerConfig, store: TrackerStateStore) -> None:
+    def __init__(
+        self,
+        config: TrackerConfig,
+        store: TrackerStateStore,
+        *,
+        schedule_timezone: str = DEFAULT_TRACKER_TIMEZONE,
+        failure_retry_cooldown: timedelta = timedelta(hours=1),
+    ) -> None:
         self.config = config
         self.store = store
+        self.schedule_timezone = schedule_timezone
+        self.failure_retry_cooldown = failure_retry_cooldown
 
     def list_due_trackers(self, now: datetime | None = None) -> list[DueTracker]:
         current_time = now or _utcnow()
@@ -20,7 +29,13 @@ class TrackerScheduler:
 
         for tracker in self.config.enabled_trackers():
             state = latest_runs.get(tracker.id)
-            due_reason = _resolve_due_reason(tracker.source_frequency, state, current_time)
+            due_reason = _resolve_due_reason(
+                tracker.source_frequency,
+                state,
+                current_time,
+                schedule_timezone=self.schedule_timezone,
+                failure_retry_cooldown=self.failure_retry_cooldown,
+            )
             if due_reason is not None:
                 due.append(
                     DueTracker(
@@ -61,15 +76,23 @@ def _resolve_due_reason(
     source_frequency: str,
     state: TrackerRunState | None,
     now: datetime,
+    *,
+    schedule_timezone: str = DEFAULT_TRACKER_TIMEZONE,
+    failure_retry_cooldown: timedelta = timedelta(hours=1),
 ) -> str | None:
+    frequency = normalize_source_frequency(source_frequency)
     if state is None:
         return "never_run"
     if state.last_status != "success":
-        return "retry_after_failure"
+        retry_at = state.last_finished_at + failure_retry_cooldown
+        if now >= retry_at:
+            return "retry_after_failure"
+        return None
 
-    interval = resolve_frequency_interval(source_frequency)
-    if now >= state.last_finished_at + interval:
-        return f"interval_elapsed:{source_frequency}"
+    last_period = tracker_period_key(frequency, state.last_finished_at, timezone_name=schedule_timezone)
+    current_period = tracker_period_key(frequency, now, timezone_name=schedule_timezone)
+    if current_period != last_period:
+        return f"period_elapsed:{frequency}:{last_period}->{current_period}"
     return None
 
 

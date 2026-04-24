@@ -1,0 +1,12 @@
+version = 1
+
+# source_frequency supports:
+# daily, weekly, biweekly, monthly, bimonthly, quarterly
+
+[[trackers]]
+id = "example_linkedin_backend"
+label = "Example LinkedIn backend search"
+url = "https://www.linkedin.com/jobs/search-results/?keywords=backend%20engineer"
+source_frequency = "weekly"
+target_new_jobs = 10
+enabled = false

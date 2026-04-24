@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .config_files import ensure_config_file
+
 
 @dataclass(frozen=True)
 class MySQLSettings:
@@ -99,7 +101,7 @@ class RuntimeSettings:
 
 
 def load_runtime_settings(repo_root: Path, path: str | Path = "config/runtime.toml") -> RuntimeSettings:
-    config_path = repo_root / path
+    config_path = ensure_config_file(repo_root, path)
     payload = tomllib.loads(config_path.read_text(encoding="utf-8"))
 
     mysql_payload = dict(payload["mysql"])

@@ -55,7 +55,7 @@
 - `id`: 稳定内部标识
 - `label`: 给人看的名字
 - `url`: 对应 tracker / search results URL
-- `source_frequency`: 这个 tracker 的原始巡检节奏，目前支持 `daily` / `weekly`
+- `source_frequency`: 这个 tracker 的巡检节奏，支持 `daily` / `weekly` / `biweekly` / `monthly` / `bimonthly` / `quarterly`
 - `target_new_jobs`: 本次运行希望抓到多少条新的 job links；如果来源结果不足，就抓到 source exhaust 为止
 - `enabled`: 是否启用
 
@@ -67,17 +67,52 @@
 
 ## Due Logic
 
-当前第一版 due 判断很简单：
+当前 due 判断使用自然日历周期，而不是滚动 interval：
 
 1. 从没跑过 -> `due`
-2. 上次失败 -> `due`
-3. 上次成功且超过频率窗口 -> `due`
+2. 上次失败且超过 failure cooldown -> `due`
+3. 上次成功但已经进入新的 calendar bucket -> `due`
 4. 否则暂时不跑
 
 例如：
 
-- `daily`: 距离上次成功 >= 1 day
-- `weekly`: 距离上次成功 >= 7 days
+- `daily`: 西雅图本地自然日变更后才 due
+- `weekly`: ISO week 变更后才 due
+- `biweekly`: 两周 bucket 变更后才 due
+- `monthly`: 月份变更后才 due
+- `bimonthly`: 双月 bucket 变更后才 due
+- `quarterly`: 季度变更后才 due
+
+默认调度时区是 `America/Los_Angeles`。数据库时间仍然以 UTC 存储。
+
+## Runtime Admission Control
+
+在 queue-driven runtime 里，“due” 不等于立刻入队。Tracker worker 会先经过 MySQL admission control：
+
+- 同一个 tracker 同时最多只有一个 active discovery request
+- 每轮最多 admit `max_admissions_per_cycle` 个 tracker
+- 全局 active discovery request 数量受 `max_pending_discovery_requests` 限制
+- stale active request 会按 `discovery_request_ttl_hours` 过期
+- admission 排序优先照顾从未 admit 或最久未 admit 的 tracker，避免 tracker starvation
+- 每次 tracker run 下游最多发出 `max_capture_requests_per_tracker_run` 个 capture request
+
+这些配置在本地 `config/runtime.toml` 的 `[services.tracker]` 里；默认模板在 `config_templates/runtime.toml`。
+
+## Worker-Scoped Graceful Shutdown
+
+Tracker Worker 支持 worker-scoped `drain-current`：
+
+- 如果当前 worker idle，它不会再 poll 新消息，直接退出
+- 如果当前 worker 正在处理一个 discovery message，它会完成当前消息、记录状态、提交 offset，然后退出
+- 不会 drain 全局 Kafka queue
+- 不会阻止其他 Tracker worker 继续消费
+
+控制命令：
+
+```bash
+./.venv/bin/python scripts/control_tracker_service.py --state drain-current --worker-id default
+./.venv/bin/python scripts/control_tracker_service.py --state running --worker-id default
+```
 
 ## Source Adapters
 
@@ -140,7 +175,8 @@
 当前实现方式是：
 
 - 抽象出 `TrackerStateStore`
-- 默认只实现 `SQLiteTrackerStateStore`
+- queue-driven runtime 使用 `MySQLTrackerStateStore`
+- `SQLiteTrackerStateStore` 只保留给旧 CLI / 本地 utility 路径
 
 后续可以补：
 
@@ -151,7 +187,7 @@
 
 ## Current Tables
 
-SQLite 第一版会记录三类信息：
+Tracker state 会记录这些信息：
 
 1. `tracker_runs`
    - 每次 tracker 运行的摘要
@@ -166,6 +202,12 @@ SQLite 第一版会记录三类信息：
    - 用来保留 tracker 层面的发现历史
 
 这里的重复命中**不是价值信号**，只是一种调度状态。
+
+4. `tracker_discovery_requests`
+   - runtime admission / active coalesce / stale expiry 状态
+
+5. `runtime_worker_controls`
+   - worker-scoped control plane，例如 Tracker `drain-current`
 
 ## CLI
 
@@ -287,5 +329,4 @@ python3 scripts/prepare_tracker_discovery_batch.py \
 
 当前仍然存在的限制主要是：
 
-- live executor 一次运行只完成“一轮 discovery”，还没有接进长期调度器的自动批量编排
 - 如果同一个 tracker 因为大量历史已见链接而需要更深分页，后续还可以继续增强 prompt / host loop

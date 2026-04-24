@@ -140,8 +140,7 @@ Manual Intake 需要支持的 payload：
 - 当前第一版已验证：
   - `JD 文本`
   - `岗位链接 + JD 文本`
-- 当前第一版仍未接入：
-  - `纯岗位链接` 直接自动抓网页再分析
+- 当前第一版已支持 `纯岗位链接`，由 `Capture` 节点内部触发 live browser capture 后继续进入 `Analyzer`。
 
 ### 2. Email Forward
 
@@ -260,6 +259,12 @@ python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto -
 - `Browser Execution Broker` 是**每台浏览器节点本地**的运行时驱动层，不单独算作系统部件
 
 ### 一次性准备
+
+先初始化缺失的本地配置文件。真实运行配置在 `config/*.toml`，不进入 git；默认模板在 `config_templates/`：
+
+```bash
+./.venv/bin/python scripts/init_local_config.py
+```
 
 先准备 Python 运行环境：
 
@@ -382,6 +387,12 @@ data/logs/telegram_manual_intake.err.log
   - 从原始输入到 Notion/Telegram 标题渲染的固定 smoke
 - `tests/test_manual_intake_service.py`
   - runtime `manual-intake` worker 会把结构化字段正确入队
+- `tests/test_tracker_schedule.py`
+  - Tracker 使用西雅图自然日历周期，而不是简单滚动 interval
+  - 覆盖 `daily / weekly / biweekly / monthly / bimonthly / quarterly`
+- `tests/test_tracker_service_controls.py`
+  - Tracker admission 会跳过 active tracker，并优先 admit 最久没跑到的 tracker
+  - `drain-current` worker 在 idle 状态不会再接新任务
 
 部署前建议至少跑：
 
@@ -415,6 +426,31 @@ data/logs/telegram_manual_intake.err.log
 - 只消费主结果列表
 - 点击岗位卡片并读取原始 URL
 - 由宿主机在任务结束后自动回收本次新增的 Chrome 窗口
+
+Tracker runtime 现在还增加了调度保护：
+
+- `source_frequency` 支持 `daily / weekly / biweekly / monthly / bimonthly / quarterly`
+- 周期按 `America/Los_Angeles` 的自然日历 bucket 判断，DB 中仍保存 UTC
+- due tracker 不会直接无限入队；会先经过 MySQL admission control
+- 同一个 tracker 同时最多只有一个 active discovery request
+- 超过 backlog cap 会 throttle，stale request 会 expire
+- admission 会优先照顾从未 admit 或最久未 admit 的 tracker，避免后排 tracker 饿死
+
+让某个 Tracker worker 优雅停机：
+
+```bash
+./.venv/bin/python scripts/control_tracker_service.py \
+  --state drain-current \
+  --worker-id default
+```
+
+这不是 drain 全局队列；它只影响当前 `node_id + worker_id` 对应的 worker。恢复接活：
+
+```bash
+./.venv/bin/python scripts/control_tracker_service.py \
+  --state running \
+  --worker-id default
+```
 
 手动跑一轮 tracker discovery：
 

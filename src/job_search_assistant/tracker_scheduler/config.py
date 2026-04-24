@@ -5,15 +5,21 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from job_search_assistant.runtime.config_files import ensure_config_file
+
+from .frequency import SUPPORTED_TRACKER_FREQUENCIES, normalize_source_frequency
 from .models import TrackerConfig, TrackerDefinition
 
 
-VALID_FREQUENCIES = {"daily", "weekly"}
+VALID_FREQUENCIES = set(SUPPORTED_TRACKER_FREQUENCIES)
 TRACKER_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
 def load_tracker_config(path: str | Path) -> TrackerConfig:
     config_path = Path(path)
+    if not config_path.exists() and not config_path.is_absolute():
+        repo_root = Path(__file__).resolve().parents[3]
+        config_path = ensure_config_file(repo_root, config_path)
     payload = tomllib.loads(config_path.read_text(encoding="utf-8"))
     version = _parse_positive_int(payload.get("version", 1), field_name="version")
     raw_trackers = payload.get("trackers")
@@ -42,7 +48,9 @@ def _parse_tracker(payload: dict[str, Any]) -> TrackerDefinition:
             f"(got {tracker_id!r})."
         )
 
-    source_frequency = _required_text(payload.get("source_frequency"), field_name="source_frequency").lower()
+    source_frequency = normalize_source_frequency(
+        _required_text(payload.get("source_frequency"), field_name="source_frequency")
+    )
     if source_frequency not in VALID_FREQUENCIES:
         raise ValueError(
             f"Unsupported source_frequency {source_frequency!r}. "
