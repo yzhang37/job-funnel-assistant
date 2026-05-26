@@ -197,3 +197,12 @@ Current output-layer progress:
 - current manual chain now supports:
   - `纯 job_url` 自动触发 live browser capture
   - this path runs inside `Capture` with local `Codex` + `Computer Use`
+
+Current Windows migration direction:
+
+- Windows 本机运行优先面向 MSYS2 `zsh` / `oh-my-zsh`，不把 PowerShell 作为项目默认入口
+- 项目脚本应尽量保持一套 POSIX/zsh 写法，让 macOS 和 Windows/MSYS2 共用同一套入口
+- Windows 单机迁移优先先用手动 worker 命令跑通，再考虑常驻服务
+- 后续可以用 Docker 按组件运行 `Tracker`、`Manual Intake`、`Capture`、`Analyzer`、`Output`
+- `MySQL` / `Kafka` 优先作为容器化 runtime；多组件运行前需要解决 shared artifact store
+- `Tracker` / `Capture` 仍依赖 Chrome / Computer Use 能力，Docker 化时需要单独设计 browser-capable node
