@@ -16,6 +16,7 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 
 - `README.md`: human-readable overview and setup notes
 - `PLANS.md`: active roadmap and phased execution plan
+- `EXPERIMENTS.md` (when present): chronological log for validation attempts, failed approaches, surprising behavior, and process corrections; durable decisions belong in `PLANS.md`
 - `config/`: local runtime configuration copied from templates; do not track machine-specific `.toml` files
 - `config_templates/`: tracked default config templates used for first-run local initialization
 - `templates/`: reusable prompt, analysis, and resume templates
@@ -82,6 +83,19 @@ The user is Chinese-speaking. Prefer concise Chinese in user-facing docs and out
 - Keep browser capture source-agnostic where practical. Avoid assuming LinkedIn-only fields, fixed screenshot counts, or platform-specific packet shapes unless a task explicitly calls for it.
 - Preserve the user's templates and wording where possible; avoid rewriting them unless asked.
 
+## Operating Discipline
+
+- Before changing files, configuration, environment, external service state, or user-visible behavior, identify the active repository root, target files or systems, source of truth, observation path, intended side effects, and rollback risk.
+- Re-read `AGENTS.md`, `PLANS.md`, and relevant recent `EXPERIMENTS.md` entries before implementation, diagnosis, validation, retry work, or work after context compaction / long-running tasks.
+- Distinguish user requests, accepted decisions, candidate approaches, rejected directions, diagnostics, prototypes, workarounds, and target implementation. A proposal is not permission to change architecture, workflow, dependencies, environment, or user-visible behavior.
+- Do not present an unproven hypothesis as a conclusion. Label guesses as hypotheses, state the missing evidence, and stop changing the target if the causal chain is not established.
+- If the same symptom survives two product-code changes or two validation attempts do not reduce uncertainty, stop editing/retrying and reassess the observation path, missing facts, source of truth, and relevant `EXPERIMENTS.md` history.
+- When a needed decision depends on behavior owned by a third-party site, tool, API, file format, protocol, platform, or service, ground that fact with an appropriate source of truth before planning cleanup, rollback, repeated validation, causal explanation, or target changes.
+- Validation tools are not automatically neutral. Before using a failed or surprising result as product evidence, check whether the launcher, timeout, retry, cleanup, mock, fixture, generated input, working directory, permission, dependency, or environment changed the observed behavior.
+- Do not substitute a mock, generated approximation, fake UI, screenshot, local guess, or workaround for real target behavior unless the user explicitly accepts that substitution.
+- Prefer existing project tools, current `PATH`, common local install locations, and shared workspace tools before downloading or adding dependencies. Ask before installing new tools or modifying global machine state.
+- Do not infer directory roles from folder names alone. Before relying on source, generated, cache, artifact, backup, or runtime directories, confirm their role from project docs or record the role here / in `PLANS.md`.
+
 ## Commands
 
 The project may start without a fixed stack. Before adding new tools or dependencies:
@@ -89,6 +103,8 @@ The project may start without a fixed stack. Before adding new tools or dependen
 1. inspect the repository state
 2. document the chosen stack in `README.md`
 3. add runnable commands here once they exist
+
+Do not infer destructive or state-changing behavior from generic operation names such as `install`, `clean`, `restore`, `repair`, `modify`, or `status`. Define the scope, side effects, rollback risk, and validation method before treating any of them as project commands.
 
 Common expected commands once implemented:
 
@@ -109,6 +125,7 @@ Common expected commands once implemented:
 - install Telegram manual-intake launch agent: `python3 scripts/install_telegram_manual_intake_launch_agent.py --provider auto --model gpt-5.4 --analysis-mode full`
 - install queue-driven runtime launch agents and cut over from legacy Telegram intake: `./.venv/bin/python scripts/install_runtime_launch_agents.py`
 - initialize missing local config files from tracked templates: `./.venv/bin/python scripts/init_local_config.py`
+- run local Task Manager web UI: `./.venv/bin/python scripts/run_task_manager.py --host 127.0.0.1 --port 8765`
 - set tracker worker control state: `./.venv/bin/python scripts/control_tracker_service.py --state <running|drain-current|stopped> --worker-id default`
 - run browser node preflight once (or re-run with `--force` after permissions change): `./.venv/bin/python scripts/run_browser_preflight.py --force`
 - uninstall queue-driven runtime launch agents: `./.venv/bin/python scripts/uninstall_runtime_launch_agents.py`
@@ -158,6 +175,18 @@ A task is complete only when all relevant items are true:
 2. Any new workflow is documented in `README.md`
 3. The changed path is validated with the best available check
 4. Limitations, assumptions, and next steps are recorded if something is unfinished
+5. Completed implementation work has explicit validation evidence, or a clear note explaining why validation was not possible
+6. Durable product decisions and target-behavior changes are reflected in `PLANS.md`; trial/error and surprising validation behavior are recorded in `EXPERIMENTS.md` when that log exists or is introduced for the task
+
+## Documentation Discipline
+
+- `AGENTS.md` is the canonical agent instruction file: operating rules, safety policies, repeatable procedures, command semantics, and validation discipline.
+- `PLANS.md` tracks product goals, accepted decisions, current target behavior, architecture notes, open work, risks, and validation status. This project uses `PLANS.md`; do not create a parallel `PLAN.md`.
+- `EXPERIMENTS.md`, when present, is the chronological work log for trial/error, validation attempts, failed approaches, surprising system behavior, and corrections to the work process.
+- `README.md` remains the user-facing overview, setup guide, and usage documentation.
+- Do not put durable user intent, product architecture, or accepted target behavior only in chat, commit messages, or `EXPERIMENTS.md`; summarize final decisions in `PLANS.md`.
+- Do not turn `PLANS.md` into a transcript or scratchpad. Keep exploration details and failed attempts in `EXPERIMENTS.md`; keep reusable workflow rules in `AGENTS.md`.
+- If a validation attempt or failed approach involves harness side effects, record the launch method, timeout, kill/retry/cleanup behavior, mocks, environment, working directory, and source of truth used for any external-owned fact.
 
 ## Current Direction
 

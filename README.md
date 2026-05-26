@@ -335,6 +335,27 @@ tail -f data/logs/runtime/output.out.log
 tail -f data/logs/runtime/tracker.out.log
 ```
 
+启动本地 Task Manager 网页：
+
+```bash
+./.venv/bin/python scripts/run_task_manager.py --host 127.0.0.1 --port 8765
+```
+
+然后打开：
+
+```text
+http://127.0.0.1:8765/
+```
+
+当前第一版 Task Manager 支持：
+
+- 查看 runtime overview
+- 查看 tracker list、due 状态、最近运行摘要
+- 查看 Capture / Analyzer 最近 jobs
+- 查看 cache summary 和 TTL 状态
+- 查看 tracker log tail
+- 对 Tracker worker 执行 `drain-current` / `running`
+
 `manual-intake` worker 现在也会记录结构化 normalization 日志，例如：
 
 - `manual_intake.normalize.start`
